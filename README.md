@@ -107,6 +107,17 @@ electraone raw --category 0x02 --command 0x7F
 
 File arguments accept `-` to read from stdin, e.g. `cat preset.json | electraone preset upload -`.
 
+### Listening
+
+`events listen`, `logger listen`, and `midi-learn listen` all print incoming messages as `[HH:MM:SS.mmm] <description>` - a host-side wall-clock timestamp on every line, not just log text, so a live stream stays easy to read chronologically regardless of which kind of line it is. `logger listen` subscribes to controller events in addition to enabling the logger (same `--page`/`--control-set`/`--usb-host`/`--pots`/`--touch`/`--button`/`--window`/`--all` flags as `events listen`, defaulting to all event types), so you see Pot Touch/Page Switch/etc. interleaved with log messages in one stream instead of having to run two terminals:
+
+```bash
+electraone logger listen --duration 30
+electraone logger listen --pots --touch  # log messages + just these event types
+```
+
+`--timeout` doesn't apply to `listen` commands - that's for one-shot request/reply commands, where a slow reply usually means something's wrong. `listen` is inherently open-ended: with no `--duration`, it waits indefinitely (including for the initial enable/subscribe handshake) until Ctrl+C, and with `--duration N` it gives up on the whole thing - handshake included - once N seconds have passed, printing a `--duration elapsed` error if the handshake itself never got a reply in that window.
+
 ## File Transfer API (`files`)
 
 The [File Transfer API](https://docs.electra.one/developers/filetransfer.html) (firmware 4.0+) uploads/lists/removes files stored on the device, using an atomic transaction: open a cache, register one or more files with their size, stream each one in chunks, then commit with an MD5 checksum per file — the device verifies every checksum and either applies all files or rejects the whole transaction.

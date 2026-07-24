@@ -176,11 +176,29 @@ void listen(const Context& ctx, const std::vector<std::vector<uint8_t>>& initial
     MidiTransport transport;
     transport.open(ctx.port, ctx.resolvedOutPortIndex(), ctx.resolvedInPortIndex());
 
+    using clock = std::chrono::steady_clock;
+    std::optional<clock::time_point> deadline;
+    if (durationSec > 0) deadline = clock::now() + std::chrono::seconds(durationSec);
+
+    // `listen` commands are meant to run until Ctrl+C or --duration, not
+    // ctx.timeoutMs (that's for quick one-shot request/reply commands) - so
+    // both the initial setup handshake and the event loop below poll in
+    // short increments, bounded only by --duration if one was given.
+    // Without --duration this waits indefinitely, which is the point.
+    auto waitForNext = [&]() -> std::optional<std::vector<uint8_t>> {
+        while (!deadline.has_value() || clock::now() < *deadline) {
+            auto msg = transport.waitForReply(200);
+            if (msg.has_value()) return msg;
+        }
+        return std::nullopt;
+    };
+
+    if (!initialMessages.empty()) std::cout << "Connecting...\n";
     for (const auto& initialMessage : initialMessages) {
         transport.send(initialMessage);
-        auto ack = transport.waitForReply(ctx.timeoutMs);
+        auto ack = waitForNext();
         if (!ack.has_value()) {
-            std::cerr << "error: timed out waiting for a reply to the initial request\n";
+            std::cerr << "error: --duration elapsed before getting a reply to the initial request\n";
             exitCode = 2;
             return;
         }
@@ -196,16 +214,9 @@ void listen(const Context& ctx, const std::vector<std::vector<uint8_t>>& initial
     if (durationSec > 0) std::cout << " for " << durationSec << "s";
     std::cout << " (Ctrl+C to stop)...\n";
 
-    using clock = std::chrono::steady_clock;
-    std::optional<clock::time_point> deadline;
-    if (durationSec > 0) deadline = clock::now() + std::chrono::seconds(durationSec);
-
-    while (!deadline.has_value() || clock::now() < *deadline) {
-        auto msg = transport.waitForReply(200);
-        if (msg.has_value()) {
-            auto parsed = sysex::parseResponse(*msg);
-            if (parsed.has_value()) onEvent(*parsed);
-        }
+    while (auto msg = waitForNext()) {
+        auto parsed = sysex::parseResponse(*msg);
+        if (parsed.has_value()) onEvent(*parsed);
     }
     exitCode = 0;
 }

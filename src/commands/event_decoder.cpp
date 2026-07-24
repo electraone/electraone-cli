@@ -1,8 +1,32 @@
 #include "commands/event_decoder.hpp"
 
+#include <chrono>
+#include <ctime>
+#include <iomanip>
+#include <iostream>
 #include <sstream>
 
 namespace commands {
+
+namespace {
+
+std::string timestampPrefix() {
+    using namespace std::chrono;
+    auto now = system_clock::now();
+    auto ms = duration_cast<milliseconds>(now.time_since_epoch()) % 1000;
+    std::time_t t = system_clock::to_time_t(now);
+    std::tm tmBuf{};
+#ifdef _WIN32
+    localtime_s(&tmBuf, &t);
+#else
+    localtime_r(&t, &tmBuf);
+#endif
+    std::ostringstream os;
+    os << std::put_time(&tmBuf, "%H:%M:%S") << '.' << std::setfill('0') << std::setw(3) << ms.count();
+    return os.str();
+}
+
+}  // namespace
 
 std::string describeEvent(const sysex::ParsedResponse& r) {
     std::ostringstream os;
@@ -87,6 +111,10 @@ std::string describeEvent(const sysex::ParsedResponse& r) {
     os << "0x" << std::hex << static_cast<int>(r.category) << "/0x" << static_cast<int>(r.command)
        << std::dec << " payload=" << sysex::toHex(r.payload);
     return os.str();
+}
+
+void printEventWithTimestamp(const sysex::ParsedResponse& resp) {
+    std::cout << "[" << timestampPrefix() << "] " << describeEvent(resp) << "\n";
 }
 
 }  // namespace commands

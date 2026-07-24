@@ -58,6 +58,36 @@ inline std::vector<uint8_t> optionalBankSlotParams(CLI::Option* bankOpt, CLI::Op
     return {};
 }
 
+// Adds the Subscribe Events flag options (--page, --control-set, ...,
+// --all) to sub, writing into the given bool references. Shared by `events
+// subscribe`/`events listen` and `logger listen` (which subscribes too, so
+// non-log events print alongside log messages).
+inline void addSubscribeFlags(CLI::App* sub, bool& page, bool& controlSet, bool& usbHost, bool& pots, bool& touch,
+                               bool& button, bool& window, bool& all) {
+    sub->add_flag("--page", page, "Subscribe to Page Switch events");
+    sub->add_flag("--control-set", controlSet, "Subscribe to Control Set Switch events");
+    sub->add_flag("--usb-host", usbHost, "Subscribe to USB Host Change events");
+    sub->add_flag("--pots", pots, "Subscribe to Pots events");
+    sub->add_flag("--touch", touch, "Subscribe to Touch events");
+    sub->add_flag("--button", button, "Subscribe to Button events");
+    sub->add_flag("--window", window, "Subscribe to Window events");
+    sub->add_flag("--all", all, "Subscribe to all event types");
+}
+
+inline uint8_t subscribeFlagsToByte(bool page, bool controlSet, bool usbHost, bool pots, bool touch, bool button,
+                                     bool window, bool all) {
+    if (all) return 0x7F;
+    uint8_t flags = 0;
+    if (page) flags |= 1 << 0;
+    if (controlSet) flags |= 1 << 1;
+    if (usbHost) flags |= 1 << 2;
+    if (pots) flags |= 1 << 3;
+    if (touch) flags |= 1 << 4;
+    if (button) flags |= 1 << 5;
+    if (window) flags |= 1 << 6;
+    return flags;
+}
+
 // Serializes an ArduinoJson document to a 7-bit ASCII byte vector suitable
 // as a SysEx payload.
 inline std::vector<uint8_t> jsonToBytes(const JsonDocument& doc) {

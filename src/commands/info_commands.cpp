@@ -1,5 +1,3 @@
-#include <iostream>
-
 #include "commands/command.hpp"
 #include "commands/common.hpp"
 #include "commands/event_decoder.hpp"
@@ -30,10 +28,7 @@ void registerInfoCommands(CLI::App& app, runner::Context& ctx) {
     auto* listen = midiLearn->add_subcommand(
         "listen", "Listen for MIDI Learn Info events (parameter captures) until Ctrl+C or --duration elapses");
     listen->add_option("--duration", duration, "Stop after this many seconds (0 = run forever)")->default_val(0);
-    listen->callback([&ctx] {
-        runner::listen(ctx, {}, duration,
-                        [](const sysex::ParsedResponse& r) { std::cout << commands::describeEvent(r) << "\n"; });
-    });
+    listen->callback([&ctx] { runner::listen(ctx, {}, duration, commands::printEventWithTimestamp); });
 
     auto* usb = app.add_subcommand("usb-devices", "USB host device queries");
     usb->require_subcommand(1);

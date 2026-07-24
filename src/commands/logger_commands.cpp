@@ -1,5 +1,3 @@
-#include <iostream>
-
 #include "commands/command.hpp"
 #include "commands/common.hpp"
 #include "commands/event_decoder.hpp"
@@ -23,19 +21,23 @@ void registerLoggerCommands(CLI::App& app, runner::Context& ctx) {
     {
         static std::string loggerPort = "ctrl";
         static int duration = 0;
+        static bool page = false, controlSet = false, usbHost = false, pots = false, touch = false,
+                    button = false, window = false, all = true;
         auto* sub = logger->add_subcommand(
-            "listen", "Enable logging, route it to this port, then print Log Message events until Ctrl+C or "
-                      "--duration elapses");
+            "listen", "Enable logging, route it to this port, subscribe to controller events too, then print "
+                      "both (timestamped) until Ctrl+C or --duration elapses (default: all event types)");
         sub->add_option("--logger-port", loggerPort,
                          "Which device port to route log output to (default: ctrl, i.e. the port we're listening on)")
             ->default_val("ctrl");
         sub->add_option("--duration", duration, "Stop after this many seconds (0 = run forever)")->default_val(0);
+        commands::addSubscribeFlags(sub, page, controlSet, usbHost, pots, touch, button, window, all);
         sub->callback([&ctx] {
             auto enableMsg = sysex::buildMessage(0x7F, 0x7D, {0x01, 0x00}, ctx.txnId);
             auto setPortMsg =
                 sysex::buildMessage(0x14, 0x7D, {commands::parsePortSelector(loggerPort), 0x00}, ctx.txnId);
-            runner::listen(ctx, {enableMsg, setPortMsg}, duration,
-                            [](const sysex::ParsedResponse& r) { std::cout << commands::describeEvent(r) << "\n"; });
+            uint8_t flags = commands::subscribeFlagsToByte(page, controlSet, usbHost, pots, touch, button, window, all);
+            auto subscribeMsg = sysex::buildMessage(0x14, 0x79, {flags}, ctx.txnId);
+            runner::listen(ctx, {enableMsg, setPortMsg, subscribeMsg}, duration, commands::printEventWithTimestamp);
         });
     }
 }
