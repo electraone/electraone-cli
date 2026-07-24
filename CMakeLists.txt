@@ -69,6 +69,21 @@ add_library(electraone_api STATIC
   src/midi_transport.cpp
 )
 set_target_properties(electraone_api PROPERTIES OUTPUT_NAME electraone)
+if(WIN32)
+  # On Windows, every linked executable gets a companion import library
+  # (TARGET_IMPLIB) even though it exports nothing - and CMake names it
+  # after the target, so the "electraone" CLI executable's throwaway
+  # import lib would otherwise land right next to this library's real
+  # electraone.lib and silently overwrite it (whichever links last wins),
+  # leaving anything that links electraone_api afterwards with unresolved
+  # symbols. Route this target's archive output to its own directory so
+  # the two "electraone.lib" files can never collide. Not needed on
+  # macOS/Linux, where executables don't get a companion import library,
+  # and examples/Makefile hardcodes the default build/libelectraone.a path.
+  set_target_properties(electraone_api PROPERTIES
+    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+  )
+endif()
 target_include_directories(electraone_api
   PUBLIC include
   PRIVATE src

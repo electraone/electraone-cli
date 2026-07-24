@@ -1,5 +1,7 @@
 #include <doctest/doctest.h>
 
+#include <stdexcept>
+
 #include <electraone/sysex.hpp>
 
 using namespace sysex;
