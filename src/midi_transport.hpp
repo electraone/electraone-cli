@@ -29,10 +29,16 @@ public:
     static std::vector<std::string> listInputPortNames();
 
     // Opens the output+input port pair whose name contains nameSubstring
-    // (case-insensitive), or, if portIndex is set, opens that index directly
-    // on both the output and input port lists. Throws std::runtime_error with
-    // the candidate list if the match isn't exactly one port.
-    void open(const std::string& nameSubstring, std::optional<unsigned int> portIndex);
+    // (case-insensitive). outPortIndex/inPortIndex, if set, each open that
+    // index directly on the corresponding port list instead of name-matching
+    // - independently, since the output and input port lists aren't always
+    // the same length (e.g. on Windows, a software-only synth can appear as
+    // an extra output port with no matching input, shifting every real
+    // device's output index out of alignment with its input index). Throws
+    // std::runtime_error with the candidate list if a name match isn't
+    // exactly one port, or if an explicit index is out of range.
+    void open(const std::string& nameSubstring, std::optional<unsigned int> outPortIndex,
+              std::optional<unsigned int> inPortIndex);
 
     void send(const std::vector<uint8_t>& bytes);
 

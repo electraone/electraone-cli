@@ -55,7 +55,7 @@ void registerRawCommands(CLI::App& app, runner::Context& ctx) {
         }
 
         MidiTransport transport;
-        transport.open(ctx.port, ctx.portIndex);
+        transport.open(ctx.port, ctx.resolvedOutPortIndex(), ctx.resolvedInPortIndex());
         transport.send(msg);
 
         auto raw = transport.waitForReply(ctx.timeoutMs);

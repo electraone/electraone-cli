@@ -46,9 +46,18 @@ struct ConnectOptions {
     // default finds the Electra One's CTRL port ("Electra Controller
     // Electra CTRL" on most systems) with no further configuration.
     std::string portNameSubstring = "CTRL";
-    // If set, use this MIDI port index directly (see Client::listOutputPorts
-    // / listInputPorts) instead of matching by name.
+    // If set, use this MIDI port index directly for both output and input
+    // (see Client::listOutputPorts / listInputPorts) instead of matching by
+    // name.
     std::optional<unsigned int> portIndex;
+    // Override portIndex for just the output (or input) port. Needed when
+    // the output and input port lists are different lengths - e.g. on
+    // Windows, a software-only synth can show up as an extra output port
+    // with no matching input, shifting every real device's output index out
+    // of alignment with its input index - so a single shared portIndex can't
+    // address both directions correctly.
+    std::optional<unsigned int> outPortIndex;
+    std::optional<unsigned int> inPortIndex;
     // Default reply timeout for every command method below, in milliseconds.
     int timeoutMs = 3000;
     // Optional 14-bit transaction ID attached to every outgoing request

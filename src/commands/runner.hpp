@@ -17,13 +17,23 @@ namespace runner {
 
 struct Context {
     std::string port = "CTRL";
-    std::optional<unsigned int> portIndex;
+    std::optional<unsigned int> portIndex;     // applies to both output and input port lists
+    std::optional<unsigned int> outPortIndex;  // overrides portIndex for the output port only
+    std::optional<unsigned int> inPortIndex;   // overrides portIndex for the input port only
     int timeoutMs = 3000;
     std::optional<uint16_t> txnId;
     std::string outputFile;  // empty => stdout
     bool raw = false;        // dump raw response hex instead of decoding
     bool pretty = false;     // pretty-print JSON payloads for human reading
     bool human = false;      // render JSON as a tree (objects) / ls-style listing (arrays)
+
+    // The output/input port lists aren't always the same length (e.g. on
+    // Windows, a software-only synth can appear as an extra output port with
+    // no matching input, shifting every real device's output index out of
+    // alignment with its input index) - so --out-port-index/--in-port-index
+    // take precedence over the symmetric --port-index when set.
+    std::optional<unsigned int> resolvedOutPortIndex() const { return outPortIndex ? outPortIndex : portIndex; }
+    std::optional<unsigned int> resolvedInPortIndex() const { return inPortIndex ? inPortIndex : portIndex; }
 };
 
 // Exit code of the most recently executed command: 0 success/ACK, 1 NACK,

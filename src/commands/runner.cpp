@@ -21,7 +21,7 @@ std::optional<sysex::ParsedResponse> sendAndReceive(const Context& ctx, uint8_t 
                                                       const std::vector<uint8_t>& params,
                                                       std::vector<uint8_t>* rawOut) {
     MidiTransport transport;
-    transport.open(ctx.port, ctx.portIndex);
+    transport.open(ctx.port, ctx.resolvedOutPortIndex(), ctx.resolvedInPortIndex());
 
     auto msg = sysex::buildMessage(category, command, params, ctx.txnId);
     transport.send(msg);
@@ -103,7 +103,7 @@ void runActionAwaitingAck(const Context& ctx, uint8_t category, uint8_t command,
                            const std::vector<uint8_t>& params,
                            const std::function<void(const sysex::ParsedResponse&)>& onOther) {
     MidiTransport transport;
-    transport.open(ctx.port, ctx.portIndex);
+    transport.open(ctx.port, ctx.resolvedOutPortIndex(), ctx.resolvedInPortIndex());
 
     auto msg = sysex::buildMessage(category, command, params, ctx.txnId);
     transport.send(msg);
@@ -174,7 +174,7 @@ void writeOutput(const Context& ctx, const std::string& text) {
 void listen(const Context& ctx, const std::vector<std::vector<uint8_t>>& initialMessages, int durationSec,
             const std::function<void(const sysex::ParsedResponse&)>& onEvent) {
     MidiTransport transport;
-    transport.open(ctx.port, ctx.portIndex);
+    transport.open(ctx.port, ctx.resolvedOutPortIndex(), ctx.resolvedInPortIndex());
 
     for (const auto& initialMessage : initialMessages) {
         transport.send(initialMessage);

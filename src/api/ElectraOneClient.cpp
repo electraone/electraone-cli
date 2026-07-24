@@ -145,7 +145,9 @@ std::vector<std::string> Client::listInputPorts() { return MidiTransport::listIn
 
 void Client::connect(const ConnectOptions& options) {
     impl_->options = options;
-    impl_->transport.open(options.portNameSubstring, options.portIndex);
+    auto outIndex = options.outPortIndex ? options.outPortIndex : options.portIndex;
+    auto inIndex = options.inPortIndex ? options.inPortIndex : options.portIndex;
+    impl_->transport.open(options.portNameSubstring, outIndex, inIndex);
     impl_->connected = true;
 }
 

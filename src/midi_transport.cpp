@@ -41,7 +41,8 @@ unsigned int findPortByName(const std::vector<std::string>& names,
     for (unsigned int i = 0; i < names.size(); ++i) {
         os << "  [" << i << "] " << names[i] << "\n";
     }
-    os << "Use --port with a more specific substring, or --port-index to pick one explicitly.";
+    os << "Use --port with a more specific substring, or --port-index (or --out-port-index/--in-port-index if "
+          "the output and input port lists don't line up) to pick one explicitly.";
     throw std::runtime_error(os.str());
 }
 
@@ -79,24 +80,31 @@ void MidiTransport::listPorts() {
     }
 }
 
-void MidiTransport::open(const std::string& nameSubstring, std::optional<unsigned int> portIndex) {
+void MidiTransport::open(const std::string& nameSubstring, std::optional<unsigned int> outPortIndex,
+                          std::optional<unsigned int> inPortIndex) {
     unsigned int outIndex;
-    unsigned int inIndex;
-
-    if (portIndex.has_value()) {
-        outIndex = *portIndex;
-        inIndex = *portIndex;
-        if (outIndex >= out_->getPortCount() || inIndex >= in_->getPortCount()) {
-            throw std::runtime_error("--port-index " + std::to_string(*portIndex) +
+    if (outPortIndex.has_value()) {
+        outIndex = *outPortIndex;
+        if (outIndex >= out_->getPortCount()) {
+            throw std::runtime_error("--out-port-index " + std::to_string(outIndex) +
                                       " is out of range (run 'electra list-ports' to see valid indices)");
         }
     } else {
         std::vector<std::string> outNames;
         for (unsigned int i = 0; i < out_->getPortCount(); ++i) outNames.push_back(out_->getPortName(i));
+        outIndex = findPortByName(outNames, nameSubstring, "output");
+    }
+
+    unsigned int inIndex;
+    if (inPortIndex.has_value()) {
+        inIndex = *inPortIndex;
+        if (inIndex >= in_->getPortCount()) {
+            throw std::runtime_error("--in-port-index " + std::to_string(inIndex) +
+                                      " is out of range (run 'electra list-ports' to see valid indices)");
+        }
+    } else {
         std::vector<std::string> inNames;
         for (unsigned int i = 0; i < in_->getPortCount(); ++i) inNames.push_back(in_->getPortName(i));
-
-        outIndex = findPortByName(outNames, nameSubstring, "output");
         inIndex = findPortByName(inNames, nameSubstring, "input");
     }
 

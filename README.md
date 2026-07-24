@@ -51,7 +51,10 @@ electraone list-ports
 lists all MIDI input/output ports. By default every command connects to the port whose name contains `CTRL` (case-insensitive) — on most systems that's `Electra Controller Electra CTRL`, found automatically with no configuration. Override with:
 
 - `--port <substring>` — match a different substring
-- `--port-index <n>` — use a specific port index from `list-ports` directly, bypassing name matching
+- `--port-index <n>` — use a specific port index (same one for both output and input) from `list-ports` directly, bypassing name matching
+- `--out-port-index <n>` / `--in-port-index <n>` — override `--port-index` for just the output or input side
+
+**Windows note**: WinMM's port names never contain `CTRL` (they're generic, e.g. `MIDIOUT3 (Electra Controller)`), so name matching always fails there and `--port-index` (or the pair above) is required. Windows also commonly lists an extra software-only output port (e.g. `Microsoft GS Wavetable Synth`) ahead of any real devices, with no matching input port — which shifts every subsequent output index one higher than the same device's input index. Run `list-ports` and compare: if the Electra's output and input entries land at different positions, use `--out-port-index`/`--in-port-index` instead of `--port-index` to address them independently.
 
 Other global options (must be given before the subcommand name):
 

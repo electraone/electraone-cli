@@ -66,15 +66,24 @@ inline std::vector<uint8_t> jsonToBytes(const JsonDocument& doc) {
     return sysex::encodeAscii(out);
 }
 
-// Registers a global --port/--port-index/--timeout/--txn-id/-o/--raw option
-// group on `app`, writing into ctx. Called once from main().
+// Registers a global --port/--port-index/--out-port-index/--in-port-index/
+// --timeout/--txn-id/-o/--raw option group on `app`, writing into ctx. Called
+// once from main().
 inline void addGlobalOptions(CLI::App& app, runner::Context& ctx) {
     app.add_option("--port", ctx.port,
                     "Substring to match against MIDI port names (default: CTRL)")
         ->default_val("CTRL");
     app.add_option("--port-index", ctx.portIndex,
-                    "Use this MIDI port index directly instead of matching by name "
-                    "(see 'electra list-ports')");
+                    "Use this MIDI port index directly for both output and input instead of "
+                    "matching by name (see 'electra list-ports')");
+    app.add_option("--out-port-index", ctx.outPortIndex,
+                    "Use this index for the output port directly, overriding --port-index. Needed "
+                    "when the output and input port lists are different lengths (e.g. on Windows, "
+                    "where a software-only synth can show up as an extra output port), so the "
+                    "correct output and input indices for the same device no longer match.");
+    app.add_option("--in-port-index", ctx.inPortIndex,
+                    "Use this index for the input port directly, overriding --port-index. See "
+                    "--out-port-index.");
     app.add_option("--timeout", ctx.timeoutMs, "Reply timeout in milliseconds")
         ->default_val(3000);
     app.add_option("--txn-id", ctx.txnId, "Optional 14-bit transaction ID to attach to the request");
