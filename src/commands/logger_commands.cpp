@@ -1,0 +1,41 @@
+#include <iostream>
+
+#include "commands/command.hpp"
+#include "commands/common.hpp"
+#include "commands/event_decoder.hpp"
+
+void registerLoggerCommands(CLI::App& app, runner::Context& ctx) {
+    auto* logger = app.add_subcommand("logger", "Device log output operations");
+    logger->require_subcommand(1);
+
+    logger->add_subcommand("enable", "Control Logger Output: enable")
+        ->callback([&ctx] { runner::runAction(ctx, 0x7F, 0x7D, {0x01, 0x00}); });
+    logger->add_subcommand("disable", "Control Logger Output: disable")
+        ->callback([&ctx] { runner::runAction(ctx, 0x7F, 0x7D, {0x00, 0x00}); });
+
+    {
+        static std::string port;
+        auto* sub = logger->add_subcommand("set-port", "Set Logger MIDI Port");
+        sub->add_option("--port", port, "port1, port2, or ctrl")->required();
+        sub->callback(
+            [&ctx] { runner::runAction(ctx, 0x14, 0x7D, {commands::parsePortSelector(port), 0x00}); });
+    }
+    {
+        static std::string loggerPort = "ctrl";
+        static int duration = 0;
+        auto* sub = logger->add_subcommand(
+            "listen", "Enable logging, route it to this port, then print Log Message events until Ctrl+C or "
+                      "--duration elapses");
+        sub->add_option("--logger-port", loggerPort,
+                         "Which device port to route log output to (default: ctrl, i.e. the port we're listening on)")
+            ->default_val("ctrl");
+        sub->add_option("--duration", duration, "Stop after this many seconds (0 = run forever)")->default_val(0);
+        sub->callback([&ctx] {
+            auto enableMsg = sysex::buildMessage(0x7F, 0x7D, {0x01, 0x00}, ctx.txnId);
+            auto setPortMsg =
+                sysex::buildMessage(0x14, 0x7D, {commands::parsePortSelector(loggerPort), 0x00}, ctx.txnId);
+            runner::listen(ctx, {enableMsg, setPortMsg}, duration,
+                            [](const sysex::ParsedResponse& r) { std::cout << commands::describeEvent(r) << "\n"; });
+        });
+    }
+}
