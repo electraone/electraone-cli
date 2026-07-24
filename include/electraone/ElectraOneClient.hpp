@@ -103,6 +103,12 @@ struct UploadFileOptions {
     // than corrupt anything (commit is atomic), but there's no verified
     // packing scheme to fall back to.
     bool allowBinary = false;
+    // Commit validates every file's MD5 on-device before applying anything,
+    // which can take much longer than any other command for a large file -
+    // give it its own generous timeout rather than ConnectOptions::timeoutMs
+    // (meant for quick request/reply commands). Bump this further for very
+    // large files if a commit still times out.
+    int commitTimeoutMs = 60000;
     // Called after each chunk is acknowledged, with (bytesSentSoFar, totalBytes).
     std::function<void(size_t, size_t)> onProgress;
 };
@@ -237,7 +243,11 @@ public:
     // device may interleave these before the chunk's real ACK).
     std::optional<Response> sendChunk(int id, const std::vector<uint8_t>& data, bool allowBinary = false,
                                        const std::function<void(const Response&)>& onProgress = {});
-    std::optional<Response> commitTransaction(const std::string& commitJson);
+    // Validates every file's MD5 on-device before applying anything, which
+    // can take much longer than any other command for a large file - the
+    // default timeout here (60s) is deliberately far more generous than
+    // ConnectOptions::timeoutMs; pass a larger one for very large files.
+    std::optional<Response> commitTransaction(const std::string& commitJson, int timeoutMs = 60000);
     std::optional<Response> getLocationFiles(const std::string& locationJson);
     std::optional<Response> removeLocationFiles(const std::string& locationJson);
 

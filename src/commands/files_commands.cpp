@@ -82,12 +82,19 @@ void registerFilesCommands(CLI::App& app, runner::Context& ctx) {
     }
     {
         static std::string jsonFile;
+        static int commitTimeoutMs = 60000;
         auto* sub = files->add_subcommand(
             "commit", "Commit Transaction: finalize the transfer using a hand-written file-commit JSON (use - for stdin)");
         sub->add_option("json", jsonFile, "File-commit JSON file")->required();
+        sub->add_option("--commit-timeout", commitTimeoutMs,
+                        "Reply timeout for this commit in milliseconds, independent of --timeout (on-device MD5 "
+                        "validation can take much longer than other commands for a large file)")
+            ->default_val(60000);
         sub->callback([&ctx] {
             auto content = runner::readFileOrStdin(jsonFile);
-            runner::runAction(ctx, 0x04, 0x2D, sysex::encodeAscii(content));
+            runner::Context commitCtx = ctx;
+            commitCtx.timeoutMs = commitTimeoutMs;
+            runner::runAction(commitCtx, 0x04, 0x2D, sysex::encodeAscii(content));
         });
     }
     {
@@ -122,7 +129,7 @@ void registerFilesCommands(CLI::App& app, runner::Context& ctx) {
 
     {
         static std::string file, location, type, ns, path;
-        static int bank = 0, slot = 0, id = 1, chunkSize = 256;
+        static int bank = 0, slot = 0, id = 1, chunkSize = 256, commitTimeoutMs = 60000;
         static bool allowBinary = false;
         auto* sub = files->add_subcommand(
             "upload", "Upload a file end-to-end: open + register + send all chunks + commit, in one transaction");
@@ -140,6 +147,10 @@ void registerFilesCommands(CLI::App& app, runner::Context& ctx) {
             ->default_val(256);
         sub->add_flag("--allow-binary", allowBinary,
                        "Skip the 7-bit ASCII check and send bytes as-is (see the note at the top of this file)");
+        sub->add_option("--commit-timeout", commitTimeoutMs,
+                        "Reply timeout for the final commit in milliseconds, independent of --timeout (on-device "
+                        "MD5 validation can take much longer than opening/registering/sending chunks)")
+            ->default_val(60000);
 
         sub->callback([&ctx, bankOpt, slotOpt, nsOpt, pathOpt] {
             auto content = runner::readFileOrStdin(file);
@@ -194,7 +205,9 @@ void registerFilesCommands(CLI::App& app, runner::Context& ctx) {
             if (nsOpt->count() > 0) fileObj["namespace"] = ns;
             if (pathOpt->count() > 0) fileObj["path"] = path;
             fileObj["md5"] = md5;
-            runner::runAction(ctx, 0x04, 0x2D, commands::jsonToBytes(doc));
+            runner::Context commitCtx = ctx;
+            commitCtx.timeoutMs = commitTimeoutMs;
+            runner::runAction(commitCtx, 0x04, 0x2D, commands::jsonToBytes(doc));
             if (runner::exitCode != 0) return;
 
             std::cout << "Uploaded " << file << " -> " << location << "/" << type << " (id " << id << ")\n";

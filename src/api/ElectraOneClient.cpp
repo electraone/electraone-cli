@@ -394,8 +394,8 @@ std::optional<Response> Client::sendChunk(int id, const std::vector<uint8_t>& da
         if (onProgress) onProgress(*resp);
     }
 }
-std::optional<Response> Client::commitTransaction(const std::string& commitJson) {
-    return send(0x04, 0x2D, sysex::encodeAscii(commitJson));
+std::optional<Response> Client::commitTransaction(const std::string& commitJson, int timeoutMs) {
+    return send(0x04, 0x2D, sysex::encodeAscii(commitJson), timeoutMs);
 }
 std::optional<Response> Client::getLocationFiles(const std::string& locationJson) {
     return send(0x02, 0x34, sysex::encodeAscii(locationJson));
@@ -452,7 +452,7 @@ Response Client::uploadFile(const std::vector<uint8_t>& content, const UploadFil
     std::string commitJson;
     serializeJson(doc, commitJson);
 
-    return require(commitTransaction(commitJson), "commit transaction");
+    return require(commitTransaction(commitJson, options.commitTimeoutMs), "commit transaction");
 }
 
 }  // namespace electraone
