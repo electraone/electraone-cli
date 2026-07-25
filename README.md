@@ -128,11 +128,11 @@ By default, every command connects to the port whose name contains `CTRL`
 If the default `CTRL` port does not work, specify the Electra One control port
 using the command line parameters:
 
-- `--port <substring>` — match a different substring
-- `--port-index <n>` — use a specific port index (same one for both output and
+- `--port <substring>` to match a different substring
+- `--port-index <n>` to use a specific port index (same one for both output and
   input) from `list-ports` directly, bypassing name matching
-- `--out-port-index <n>` / `--in-port-index <n>` — override `--port-index` for
-  just the output or input side
+- `--out-port-index <n>` / `--in-port-index <n>` for situations when MIDI input
+  and output have different index number, see bellow.
 
 **Windows note**: WinMM's port names may not contain `CTRL` (they're generic,
 e.g. `MIDIOUT3 (Electra Controller)`), so name matching always fails there and
