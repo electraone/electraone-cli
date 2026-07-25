@@ -11,14 +11,15 @@
 // See README.md for full per-platform prerequisites.
 
 #include <electraone/ElectraOneClient.hpp>
-
 #include <iostream>
 
-int main() {
+int main()
+{
     electraone::Client client;
     try {
-        client.connect();  // finds the CTRL port by name; see ConnectOptions to override
-    } catch (const std::exception& e) {
+        client
+            .connect(); // finds the CTRL port by name; see ConnectOptions to override
+    } catch (const std::exception &e) {
         std::cerr << "connect failed: " << e.what() << "\n";
         return 1;
     }
@@ -36,7 +37,8 @@ int main() {
 
     // Runtime commands return a plain ACK/NACK rather than data.
     auto pageSwitch = client.switchPage(0);
-    std::cout << "switch to page 0: " << (pageSwitch && pageSwitch->isAck ? "OK" : "failed") << "\n";
+    std::cout << "switch to page 0: "
+              << (pageSwitch && pageSwitch->isAck ? "OK" : "failed") << "\n";
 
     // File upload example (commented out - uncomment and point at a real
     // file/destination to try it):

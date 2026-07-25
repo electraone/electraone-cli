@@ -23,41 +23,61 @@
 // before applying anything), but there's no verified encoding to fall back
 // to. If you find the real packing scheme, this is the place to add it.
 
-namespace {
+namespace
+{
 
-std::vector<uint8_t> locationJson(const std::string& location, CLI::Option* bankOpt, int bank,
-                                   CLI::Option* slotOpt, int slot, CLI::Option* nsOpt, const std::string& ns,
-                                   CLI::Option* pathOpt, const std::string& path) {
-    JsonDocument doc;
-    doc["location"] = location;
-    if (bankOpt->count() > 0) doc["bankNumber"] = bank;
-    if (slotOpt->count() > 0) doc["slot"] = slot;
-    if (nsOpt->count() > 0) doc["namespace"] = ns;
-    if (pathOpt->count() > 0) doc["path"] = path;
-    return commands::jsonToBytes(doc);
-}
+    std::vector<uint8_t> locationJson(const std::string &location,
+                                      CLI::Option *bankOpt,
+                                      int bank,
+                                      CLI::Option *slotOpt,
+                                      int slot,
+                                      CLI::Option *nsOpt,
+                                      const std::string &ns,
+                                      CLI::Option *pathOpt,
+                                      const std::string &path)
+    {
+        JsonDocument doc;
+        doc["location"] = location;
+        if (bankOpt->count() > 0)
+            doc["bankNumber"] = bank;
+        if (slotOpt->count() > 0)
+            doc["slot"] = slot;
+        if (nsOpt->count() > 0)
+            doc["namespace"] = ns;
+        if (pathOpt->count() > 0)
+            doc["path"] = path;
+        return commands::jsonToBytes(doc);
+    }
 
-void printProgress(const sysex::ParsedResponse& r) { std::cout << commands::describeEvent(r) << "\n"; }
+    void printProgress(const sysex::ParsedResponse &r)
+    {
+        std::cout << commands::describeEvent(r) << "\n";
+    }
 
-}  // namespace
+} // namespace
 
-void registerFilesCommands(CLI::App& app, runner::Context& ctx) {
-    auto* files = app.add_subcommand(
-        "files", "File Transfer API: upload/list/remove files stored on the device (firmware 4.0+)");
+void registerFilesCommands(CLI::App &app, runner::Context &ctx)
+{
+    auto *files = app.add_subcommand(
+        "files",
+        "File Transfer API: upload/list/remove files stored on the device (firmware 4.0+)");
     files->require_subcommand(1);
 
-    files->add_subcommand("open", "Open Cache Transaction: start a new file transfer session")
+    files
+        ->add_subcommand(
+            "open", "Open Cache Transaction: start a new file transfer session")
         ->callback([&ctx] { runner::runAction(ctx, 0x01, 0x2D, {}); });
 
     {
         static int id = 0;
         static int size = 0;
-        auto* sub = files->add_subcommand("register", "Register Files: announce a file's ID and total size");
+        auto *sub = files->add_subcommand(
+            "register", "Register Files: announce a file's ID and total size");
         sub->add_option("--id", id, "File ID (0-127)")->required();
         sub->add_option("--size", size, "Total file size in bytes")->required();
         sub->callback([&ctx] {
             auto sizeBytes = sysex::encode28bit(static_cast<uint32_t>(size));
-            std::vector<uint8_t> params{static_cast<uint8_t>(id)};
+            std::vector<uint8_t> params{ static_cast<uint8_t>(id) };
             params.insert(params.end(), sizeBytes.begin(), sizeBytes.end());
             runner::runAction(ctx, 0x01, 0x2E, params);
         });
@@ -66,95 +86,167 @@ void registerFilesCommands(CLI::App& app, runner::Context& ctx) {
         static int id = 0;
         static std::string data;
         static bool allowBinary = false;
-        auto* sub = files->add_subcommand("send-chunk", "Transfer Chunks: send one raw chunk of file data");
-        sub->add_option("--id", id, "File ID matching a prior 'files register'")->required();
-        sub->add_option("--data", data, "File containing the chunk's bytes (use - for stdin)")->required();
-        sub->add_flag("--allow-binary", allowBinary,
-                       "Skip the 7-bit ASCII check and send bytes as-is (see the note at the top of this file)");
+        auto *sub = files->add_subcommand(
+            "send-chunk", "Transfer Chunks: send one raw chunk of file data");
+        sub->add_option("--id", id, "File ID matching a prior 'files register'")
+            ->required();
+        sub->add_option("--data",
+                        data,
+                        "File containing the chunk's bytes (use - for stdin)")
+            ->required();
+        sub->add_flag(
+            "--allow-binary",
+            allowBinary,
+            "Skip the 7-bit ASCII check and send bytes as-is (see the note at the top of this file)");
         sub->callback([&ctx] {
             auto content = runner::readFileOrStdin(data);
             std::vector<uint8_t> bytes(content.begin(), content.end());
-            if (!allowBinary) bytes = sysex::encodeAscii(content);
-            std::vector<uint8_t> params{static_cast<uint8_t>(id)};
+            if (!allowBinary)
+                bytes = sysex::encodeAscii(content);
+            std::vector<uint8_t> params{ static_cast<uint8_t>(id) };
             params.insert(params.end(), bytes.begin(), bytes.end());
-            runner::runActionAwaitingAck(ctx, 0x01, 0x2F, params, printProgress);
+            runner::runActionAwaitingAck(
+                ctx, 0x01, 0x2F, params, printProgress);
         });
     }
     {
         static std::string jsonFile;
         static int commitTimeoutMs = 60000;
-        auto* sub = files->add_subcommand(
-            "commit", "Commit Transaction: finalize the transfer using a hand-written file-commit JSON (use - for stdin)");
+        auto *sub = files->add_subcommand(
+            "commit",
+            "Commit Transaction: finalize the transfer using a hand-written "
+            "file-commit JSON (use - for stdin)");
         sub->add_option("json", jsonFile, "File-commit JSON file")->required();
-        sub->add_option("--commit-timeout", commitTimeoutMs,
-                        "Reply timeout for this commit in milliseconds, independent of --timeout (on-device MD5 "
-                        "validation can take much longer than other commands for a large file)")
+        sub->add_option(
+               "--commit-timeout",
+               commitTimeoutMs,
+               "Reply timeout for this commit in milliseconds, independent of --timeout (on-device MD5 "
+               "validation can take much longer than other commands for a large file)")
             ->default_val(60000);
         sub->callback([&ctx] {
             auto content = runner::readFileOrStdin(jsonFile);
             runner::Context commitCtx = ctx;
             commitCtx.timeoutMs = commitTimeoutMs;
-            runner::runAction(commitCtx, 0x04, 0x2D, sysex::encodeAscii(content));
+            runner::runAction(
+                commitCtx, 0x04, 0x2D, sysex::encodeAscii(content));
         });
     }
     {
         static std::string location, ns, path;
         static int bank = 0, slot = 0;
-        auto* sub = files->add_subcommand("list", "Get Location Files: list files (name + MD5) at a storage location");
-        sub->add_option("--location", location, "slots, updates, assets, modules, presets, or root")->required();
-        auto* bankOpt = sub->add_option("--bank", bank, "Bank number (location=slots)");
-        auto* slotOpt = sub->add_option("--slot", slot, "Slot number (location=slots)");
-        auto* nsOpt = sub->add_option("--namespace", ns, "Namespace (location=modules/presets)");
-        auto* pathOpt = sub->add_option("--path", path, "Path (location=modules/presets)");
+        auto *sub = files->add_subcommand(
+            "list",
+            "Get Location Files: list files (name + MD5) at a storage location");
+        sub->add_option("--location",
+                        location,
+                        "slots, updates, assets, modules, presets, or root")
+            ->required();
+        auto *bankOpt =
+            sub->add_option("--bank", bank, "Bank number (location=slots)");
+        auto *slotOpt =
+            sub->add_option("--slot", slot, "Slot number (location=slots)");
+        auto *nsOpt = sub->add_option(
+            "--namespace", ns, "Namespace (location=modules/presets)");
+        auto *pathOpt =
+            sub->add_option("--path", path, "Path (location=modules/presets)");
         sub->callback([&ctx, bankOpt, slotOpt, nsOpt, pathOpt] {
-            runner::runQuery(ctx, 0x02, 0x34,
-                              locationJson(location, bankOpt, bank, slotOpt, slot, nsOpt, ns, pathOpt, path));
+            runner::runQuery(ctx,
+                             0x02,
+                             0x34,
+                             locationJson(location,
+                                          bankOpt,
+                                          bank,
+                                          slotOpt,
+                                          slot,
+                                          nsOpt,
+                                          ns,
+                                          pathOpt,
+                                          path));
         });
     }
     {
         static std::string location, ns, path;
         static int bank = 0, slot = 0;
-        auto* sub =
-            files->add_subcommand("remove", "Remove Files from Location: delete every file at a storage location");
-        sub->add_option("--location", location, "slots, updates, assets, modules, presets, or root")->required();
-        auto* bankOpt = sub->add_option("--bank", bank, "Bank number (location=slots)");
-        auto* slotOpt = sub->add_option("--slot", slot, "Slot number (location=slots)");
-        auto* nsOpt = sub->add_option("--namespace", ns, "Namespace (location=modules/presets)");
-        auto* pathOpt = sub->add_option("--path", path, "Path (location=modules/presets)");
+        auto *sub = files->add_subcommand(
+            "remove",
+            "Remove Files from Location: delete every file at a storage location");
+        sub->add_option("--location",
+                        location,
+                        "slots, updates, assets, modules, presets, or root")
+            ->required();
+        auto *bankOpt =
+            sub->add_option("--bank", bank, "Bank number (location=slots)");
+        auto *slotOpt =
+            sub->add_option("--slot", slot, "Slot number (location=slots)");
+        auto *nsOpt = sub->add_option(
+            "--namespace", ns, "Namespace (location=modules/presets)");
+        auto *pathOpt =
+            sub->add_option("--path", path, "Path (location=modules/presets)");
         sub->callback([&ctx, bankOpt, slotOpt, nsOpt, pathOpt] {
-            runner::runAction(ctx, 0x05, 0x34,
-                               locationJson(location, bankOpt, bank, slotOpt, slot, nsOpt, ns, pathOpt, path));
+            runner::runAction(ctx,
+                              0x05,
+                              0x34,
+                              locationJson(location,
+                                           bankOpt,
+                                           bank,
+                                           slotOpt,
+                                           slot,
+                                           nsOpt,
+                                           ns,
+                                           pathOpt,
+                                           path));
         });
     }
 
     {
         static std::string file, location, type, ns, path;
-        static int bank = 0, slot = 0, id = 1, chunkSize = 256, commitTimeoutMs = 60000;
+        static int bank = 0, slot = 0, id = 1, chunkSize = 256,
+                   commitTimeoutMs = 60000;
         static bool allowBinary = false;
-        auto* sub = files->add_subcommand(
-            "upload", "Upload a file end-to-end: open + register + send all chunks + commit, in one transaction");
-        sub->add_option("file", file, "File to upload (use - for stdin)")->required();
-        sub->add_option("--location", location, "slots, updates, assets, modules, presets, or root")->required();
-        sub->add_option("--type", type,
-                         "firmware, bootloader, preset, lua, luaModule, ui, config, deviceList, datafile, or performance")
+        auto *sub = files->add_subcommand(
+            "upload",
+            "Upload a file end-to-end: open + register + send all chunks + commit, in one transaction");
+        sub->add_option("file", file, "File to upload (use - for stdin)")
             ->required();
-        auto* bankOpt = sub->add_option("--bank", bank, "Bank number (location=slots)");
-        auto* slotOpt = sub->add_option("--slot", slot, "Slot number (location=slots)");
-        auto* nsOpt = sub->add_option("--namespace", ns, "Namespace (location=modules/presets)");
-        auto* pathOpt = sub->add_option("--path", path, "Path (location=modules/presets)");
-        sub->add_option("--id", id, "File ID for this transaction")->default_val(1);
-        sub->add_option("--chunk-size", chunkSize, "Bytes of file data per Transfer Chunks message")
+        sub->add_option("--location",
+                        location,
+                        "slots, updates, assets, modules, presets, or root")
+            ->required();
+        sub->add_option(
+               "--type",
+               type,
+               "firmware, bootloader, preset, lua, luaModule, ui, config, deviceList, datafile, or "
+               "performance")
+            ->required();
+        auto *bankOpt =
+            sub->add_option("--bank", bank, "Bank number (location=slots)");
+        auto *slotOpt =
+            sub->add_option("--slot", slot, "Slot number (location=slots)");
+        auto *nsOpt = sub->add_option(
+            "--namespace", ns, "Namespace (location=modules/presets)");
+        auto *pathOpt =
+            sub->add_option("--path", path, "Path (location=modules/presets)");
+        sub->add_option("--id", id, "File ID for this transaction")
+            ->default_val(1);
+        sub->add_option("--chunk-size",
+                        chunkSize,
+                        "Bytes of file data per Transfer Chunks message")
             ->default_val(256);
-        sub->add_flag("--allow-binary", allowBinary,
-                       "Skip the 7-bit ASCII check and send bytes as-is (see the note at the top of this file)");
-        sub->add_option("--commit-timeout", commitTimeoutMs,
-                        "Reply timeout for the final commit in milliseconds, independent of --timeout (on-device "
-                        "MD5 validation can take much longer than opening/registering/sending chunks)")
+        sub->add_flag(
+            "--allow-binary",
+            allowBinary,
+            "Skip the 7-bit ASCII check and send bytes as-is (see the note at the top of this file)");
+        sub->add_option(
+               "--commit-timeout",
+               commitTimeoutMs,
+               "Reply timeout for the final commit in milliseconds, independent of --timeout (on-device "
+               "MD5 validation can take much longer than opening/registering/sending chunks)")
             ->default_val(60000);
 
         sub->callback([&ctx, bankOpt, slotOpt, nsOpt, pathOpt] {
             auto content = runner::readFileOrStdin(file);
-            if (chunkSize <= 0) throw std::runtime_error("--chunk-size must be positive");
+            if (chunkSize <= 0)
+                throw std::runtime_error("--chunk-size must be positive");
 
             if (!allowBinary) {
                 for (unsigned char c : content) {
@@ -168,29 +260,40 @@ void registerFilesCommands(CLI::App& app, runner::Context& ctx) {
             }
 
             std::string md5 = md5Hex(content);
-            std::cout << "MD5: " << md5 << " (" << content.size() << " bytes)\n";
+            std::cout << "MD5: " << md5 << " (" << content.size()
+                      << " bytes)\n";
 
             std::cout << "Opening cache transaction...\n";
             runner::runAction(ctx, 0x01, 0x2D, {});
-            if (runner::exitCode != 0) return;
+            if (runner::exitCode != 0)
+                return;
 
             std::cout << "Registering file id " << id << "...\n";
-            auto sizeBytes = sysex::encode28bit(static_cast<uint32_t>(content.size()));
-            std::vector<uint8_t> registerParams{static_cast<uint8_t>(id)};
-            registerParams.insert(registerParams.end(), sizeBytes.begin(), sizeBytes.end());
+            auto sizeBytes =
+                sysex::encode28bit(static_cast<uint32_t>(content.size()));
+            std::vector<uint8_t> registerParams{ static_cast<uint8_t>(id) };
+            registerParams.insert(
+                registerParams.end(), sizeBytes.begin(), sizeBytes.end());
             runner::runAction(ctx, 0x01, 0x2E, registerParams);
-            if (runner::exitCode != 0) return;
+            if (runner::exitCode != 0)
+                return;
 
             size_t sent = 0;
             while (sent < content.size()) {
-                size_t len = std::min(static_cast<size_t>(chunkSize), content.size() - sent);
-                std::vector<uint8_t> chunkParams{static_cast<uint8_t>(id)};
-                chunkParams.insert(chunkParams.end(), content.begin() + static_cast<long>(sent),
-                                    content.begin() + static_cast<long>(sent + len));
-                runner::runActionAwaitingAck(ctx, 0x01, 0x2F, chunkParams, printProgress);
-                if (runner::exitCode != 0) return;
+                size_t len = std::min(static_cast<size_t>(chunkSize),
+                                      content.size() - sent);
+                std::vector<uint8_t> chunkParams{ static_cast<uint8_t>(id) };
+                chunkParams.insert(chunkParams.end(),
+                                   content.begin() + static_cast<long>(sent),
+                                   content.begin()
+                                       + static_cast<long>(sent + len));
+                runner::runActionAwaitingAck(
+                    ctx, 0x01, 0x2F, chunkParams, printProgress);
+                if (runner::exitCode != 0)
+                    return;
                 sent += len;
-                std::cout << "sent " << sent << "/" << content.size() << " bytes\n";
+                std::cout << "sent " << sent << "/" << content.size()
+                          << " bytes\n";
             }
 
             std::cout << "Committing...\n";
@@ -200,17 +303,24 @@ void registerFilesCommands(CLI::App& app, runner::Context& ctx) {
             fileObj["id"] = id;
             fileObj["location"] = location;
             fileObj["type"] = type;
-            if (bankOpt->count() > 0) fileObj["bankNumber"] = bank;
-            if (slotOpt->count() > 0) fileObj["slot"] = slot;
-            if (nsOpt->count() > 0) fileObj["namespace"] = ns;
-            if (pathOpt->count() > 0) fileObj["path"] = path;
+            if (bankOpt->count() > 0)
+                fileObj["bankNumber"] = bank;
+            if (slotOpt->count() > 0)
+                fileObj["slot"] = slot;
+            if (nsOpt->count() > 0)
+                fileObj["namespace"] = ns;
+            if (pathOpt->count() > 0)
+                fileObj["path"] = path;
             fileObj["md5"] = md5;
             runner::Context commitCtx = ctx;
             commitCtx.timeoutMs = commitTimeoutMs;
-            runner::runAction(commitCtx, 0x04, 0x2D, commands::jsonToBytes(doc));
-            if (runner::exitCode != 0) return;
+            runner::runAction(
+                commitCtx, 0x04, 0x2D, commands::jsonToBytes(doc));
+            if (runner::exitCode != 0)
+                return;
 
-            std::cout << "Uploaded " << file << " -> " << location << "/" << type << " (id " << id << ")\n";
+            std::cout << "Uploaded " << file << " -> " << location << "/"
+                      << type << " (id " << id << ")\n";
         });
     }
 }

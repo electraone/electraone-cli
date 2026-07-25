@@ -13,13 +13,14 @@ class RtMidiOut;
 // port: port discovery, sending a SysEx message, and polling for a reply.
 // Assumes one request is in flight at a time, matching how the CLI issues a
 // single command per invocation.
-class MidiTransport {
+class MidiTransport
+{
 public:
     MidiTransport();
     ~MidiTransport();
 
-    MidiTransport(const MidiTransport&) = delete;
-    MidiTransport& operator=(const MidiTransport&) = delete;
+    MidiTransport(const MidiTransport &) = delete;
+    MidiTransport &operator=(const MidiTransport &) = delete;
 
     // Prints all available MIDI output and input ports with their indices.
     static void listPorts();
@@ -37,10 +38,11 @@ public:
     // device's output index out of alignment with its input index). Throws
     // std::runtime_error with the candidate list if a name match isn't
     // exactly one port, or if an explicit index is out of range.
-    void open(const std::string& nameSubstring, std::optional<unsigned int> outPortIndex,
+    void open(const std::string &nameSubstring,
+              std::optional<unsigned int> outPortIndex,
               std::optional<unsigned int> inPortIndex);
 
-    void send(const std::vector<uint8_t>& bytes);
+    void send(const std::vector<uint8_t> &bytes);
 
     // Polls for the next complete Electra SysEx message (F0 00 21 45 ...)
     // within timeoutMs. Returns std::nullopt on timeout.

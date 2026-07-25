@@ -3,8 +3,8 @@
 #include <RtMidi.h>
 
 #include <algorithm>
-#include <chrono>
 #include <cctype>
+#include <chrono>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -12,61 +12,75 @@
 
 #include "electraone/sysex.hpp"
 
-namespace {
+namespace
+{
 
-std::string toLower(std::string s) {
-    std::transform(s.begin(), s.end(), s.begin(),
-                    [](unsigned char c) { return std::tolower(c); });
-    return s;
-}
+    std::string toLower(std::string s)
+    {
+        std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) {
+            return std::tolower(c);
+        });
+        return s;
+    }
 
-// Finds the single port index whose name contains needle (case-insensitive).
-// Throws std::runtime_error listing all candidates if the match count != 1.
-unsigned int findPortByName(const std::vector<std::string>& names,
-                             const std::string& needle, const char* direction) {
-    std::string needleLower = toLower(needle);
-    std::vector<unsigned int> matches;
-    for (unsigned int i = 0; i < names.size(); ++i) {
-        if (toLower(names[i]).find(needleLower) != std::string::npos) {
-            matches.push_back(i);
+    // Finds the single port index whose name contains needle (case-insensitive).
+    // Throws std::runtime_error listing all candidates if the match count != 1.
+    unsigned int findPortByName(const std::vector<std::string> &names,
+                                const std::string &needle,
+                                const char *direction)
+    {
+        std::string needleLower = toLower(needle);
+        std::vector<unsigned int> matches;
+        for (unsigned int i = 0; i < names.size(); ++i) {
+            if (toLower(names[i]).find(needleLower) != std::string::npos) {
+                matches.push_back(i);
+            }
         }
+        if (matches.size() == 1) {
+            return matches.front();
+        }
+        std::ostringstream os;
+        os << (matches.empty() ? "no " : "multiple ") << direction
+           << " ports match \"" << needle << "\". Available " << direction
+           << " ports:\n";
+        for (unsigned int i = 0; i < names.size(); ++i) {
+            os << "  [" << i << "] " << names[i] << "\n";
+        }
+        os << "Use --port with a more specific substring, or --port-index (or --out-port-index/--in-port-index "
+              "if "
+              "the output and input port lists don't line up) to pick one explicitly.";
+        throw std::runtime_error(os.str());
     }
-    if (matches.size() == 1) {
-        return matches.front();
-    }
-    std::ostringstream os;
-    os << (matches.empty() ? "no " : "multiple ") << direction
-       << " ports match \"" << needle << "\". Available " << direction
-       << " ports:\n";
-    for (unsigned int i = 0; i < names.size(); ++i) {
-        os << "  [" << i << "] " << names[i] << "\n";
-    }
-    os << "Use --port with a more specific substring, or --port-index (or --out-port-index/--in-port-index if "
-          "the output and input port lists don't line up) to pick one explicitly.";
-    throw std::runtime_error(os.str());
+
+} // namespace
+
+MidiTransport::MidiTransport()
+    : in_(std::make_unique<RtMidiIn>()), out_(std::make_unique<RtMidiOut>())
+{
 }
-
-}  // namespace
-
-MidiTransport::MidiTransport() : in_(std::make_unique<RtMidiIn>()), out_(std::make_unique<RtMidiOut>()) {}
 
 MidiTransport::~MidiTransport() = default;
 
-std::vector<std::string> MidiTransport::listOutputPortNames() {
+std::vector<std::string> MidiTransport::listOutputPortNames()
+{
     RtMidiOut out;
     std::vector<std::string> names;
-    for (unsigned int i = 0; i < out.getPortCount(); ++i) names.push_back(out.getPortName(i));
+    for (unsigned int i = 0; i < out.getPortCount(); ++i)
+        names.push_back(out.getPortName(i));
     return names;
 }
 
-std::vector<std::string> MidiTransport::listInputPortNames() {
+std::vector<std::string> MidiTransport::listInputPortNames()
+{
     RtMidiIn in;
     std::vector<std::string> names;
-    for (unsigned int i = 0; i < in.getPortCount(); ++i) names.push_back(in.getPortName(i));
+    for (unsigned int i = 0; i < in.getPortCount(); ++i)
+        names.push_back(in.getPortName(i));
     return names;
 }
 
-void MidiTransport::listPorts() {
+void MidiTransport::listPorts()
+{
     auto outNames = listOutputPortNames();
     auto inNames = listInputPortNames();
 
@@ -80,18 +94,22 @@ void MidiTransport::listPorts() {
     }
 }
 
-void MidiTransport::open(const std::string& nameSubstring, std::optional<unsigned int> outPortIndex,
-                          std::optional<unsigned int> inPortIndex) {
+void MidiTransport::open(const std::string &nameSubstring,
+                         std::optional<unsigned int> outPortIndex,
+                         std::optional<unsigned int> inPortIndex)
+{
     unsigned int outIndex;
     if (outPortIndex.has_value()) {
         outIndex = *outPortIndex;
         if (outIndex >= out_->getPortCount()) {
-            throw std::runtime_error("--out-port-index " + std::to_string(outIndex) +
-                                      " is out of range (run 'electra list-ports' to see valid indices)");
+            throw std::runtime_error(
+                "--out-port-index " + std::to_string(outIndex)
+                + " is out of range (run 'electra list-ports' to see valid indices)");
         }
     } else {
         std::vector<std::string> outNames;
-        for (unsigned int i = 0; i < out_->getPortCount(); ++i) outNames.push_back(out_->getPortName(i));
+        for (unsigned int i = 0; i < out_->getPortCount(); ++i)
+            outNames.push_back(out_->getPortName(i));
         outIndex = findPortByName(outNames, nameSubstring, "output");
     }
 
@@ -99,12 +117,14 @@ void MidiTransport::open(const std::string& nameSubstring, std::optional<unsigne
     if (inPortIndex.has_value()) {
         inIndex = *inPortIndex;
         if (inIndex >= in_->getPortCount()) {
-            throw std::runtime_error("--in-port-index " + std::to_string(inIndex) +
-                                      " is out of range (run 'electra list-ports' to see valid indices)");
+            throw std::runtime_error(
+                "--in-port-index " + std::to_string(inIndex)
+                + " is out of range (run 'electra list-ports' to see valid indices)");
         }
     } else {
         std::vector<std::string> inNames;
-        for (unsigned int i = 0; i < in_->getPortCount(); ++i) inNames.push_back(in_->getPortName(i));
+        for (unsigned int i = 0; i < in_->getPortCount(); ++i)
+            inNames.push_back(in_->getPortName(i));
         inIndex = findPortByName(inNames, nameSubstring, "input");
     }
 
@@ -114,13 +134,16 @@ void MidiTransport::open(const std::string& nameSubstring, std::optional<unsigne
     in_->ignoreTypes(false, true, true);
 }
 
-void MidiTransport::send(const std::vector<uint8_t>& bytes) {
+void MidiTransport::send(const std::vector<uint8_t> &bytes)
+{
     std::vector<unsigned char> msg(bytes.begin(), bytes.end());
     out_->sendMessage(&msg);
 }
 
-std::optional<std::vector<uint8_t>> MidiTransport::waitForReply(int timeoutMs) {
-    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
+std::optional<std::vector<uint8_t>> MidiTransport::waitForReply(int timeoutMs)
+{
+    auto deadline =
+        std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
     std::vector<unsigned char> msg;
 
     while (std::chrono::steady_clock::now() < deadline) {

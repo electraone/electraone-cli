@@ -1,25 +1,30 @@
 #include "commands/command.hpp"
 #include "commands/common.hpp"
 
-namespace {
+namespace
+{
 
-std::vector<uint8_t> projectSlotJson(const std::string& projectId, int bank, int slot) {
-    JsonDocument doc;
-    doc["projectId"] = projectId;
-    doc["bankNumber"] = bank;
-    doc["slot"] = slot;
-    return commands::jsonToBytes(doc);
-}
+    std::vector<uint8_t>
+        projectSlotJson(const std::string &projectId, int bank, int slot)
+    {
+        JsonDocument doc;
+        doc["projectId"] = projectId;
+        doc["bankNumber"] = bank;
+        doc["slot"] = slot;
+        return commands::jsonToBytes(doc);
+    }
 
-}  // namespace
+} // namespace
 
-void registerSnapshotCommands(CLI::App& app, runner::Context& ctx) {
-    auto* snapshot = app.add_subcommand("snapshot", "Snapshot operations");
+void registerSnapshotCommands(CLI::App &app, runner::Context &ctx)
+{
+    auto *snapshot = app.add_subcommand("snapshot", "Snapshot operations");
     snapshot->require_subcommand(1);
 
     {
         static std::string projectId;
-        auto* sub = snapshot->add_subcommand("list", "Get Snapshots List for a project");
+        auto *sub = snapshot->add_subcommand(
+            "list", "Get Snapshots List for a project");
         sub->add_option("--project-id", projectId, "Project ID")->required();
         sub->callback([&ctx] {
             JsonDocument doc;
@@ -30,15 +35,20 @@ void registerSnapshotCommands(CLI::App& app, runner::Context& ctx) {
     {
         static std::string projectId;
         static int bank = 0, slot = 0;
-        auto* sub = snapshot->add_subcommand("get", "Get Snapshot Data (parameters) for a bank/slot");
+        auto *sub = snapshot->add_subcommand(
+            "get", "Get Snapshot Data (parameters) for a bank/slot");
         sub->add_option("--project-id", projectId, "Project ID")->required();
         commands::addBankSlot(sub, bank, slot, true);
-        sub->callback([&ctx] { runner::runQuery(ctx, 0x02, 0x03, projectSlotJson(projectId, bank, slot)); });
+        sub->callback([&ctx] {
+            runner::runQuery(
+                ctx, 0x02, 0x03, projectSlotJson(projectId, bank, slot));
+        });
     }
     {
         static std::string projectId, name, color;
         static int bank = 0, slot = 0;
-        auto* sub = snapshot->add_subcommand("update", "Update Snapshot name/color");
+        auto *sub =
+            snapshot->add_subcommand("update", "Update Snapshot name/color");
         sub->add_option("--project-id", projectId, "Project ID")->required();
         commands::addBankSlot(sub, bank, slot, true);
         sub->add_option("--name", name, "Snapshot name")->required();
@@ -56,15 +66,18 @@ void registerSnapshotCommands(CLI::App& app, runner::Context& ctx) {
     {
         static std::string projectId;
         static int bank = 0, slot = 0;
-        auto* sub = snapshot->add_subcommand("remove", "Remove Snapshot");
+        auto *sub = snapshot->add_subcommand("remove", "Remove Snapshot");
         sub->add_option("--project-id", projectId, "Project ID")->required();
         commands::addBankSlot(sub, bank, slot, true);
-        sub->callback([&ctx] { runner::runAction(ctx, 0x05, 0x06, projectSlotJson(projectId, bank, slot)); });
+        sub->callback([&ctx] {
+            runner::runAction(
+                ctx, 0x05, 0x06, projectSlotJson(projectId, bank, slot));
+        });
     }
     {
         static std::string projectId;
         static int fromBank = 0, fromSlot = 0, toBank = 0, toSlot = 0;
-        auto* sub = snapshot->add_subcommand("swap", "Swap two Snapshots");
+        auto *sub = snapshot->add_subcommand("swap", "Swap two Snapshots");
         sub->add_option("--project-id", projectId, "Project ID")->required();
         sub->add_option("--from-bank", fromBank, "Source bank")->required();
         sub->add_option("--from-slot", fromSlot, "Source slot")->required();
@@ -83,9 +96,13 @@ void registerSnapshotCommands(CLI::App& app, runner::Context& ctx) {
     {
         static std::string projectId;
         static int bank = 0, slot = 0;
-        auto* sub = snapshot->add_subcommand("set-slot", "Set Snapshot Slot (runtime, volatile)");
+        auto *sub = snapshot->add_subcommand(
+            "set-slot", "Set Snapshot Slot (runtime, volatile)");
         sub->add_option("--project-id", projectId, "Project ID")->required();
         commands::addBankSlot(sub, bank, slot, true);
-        sub->callback([&ctx] { runner::runAction(ctx, 0x14, 0x09, projectSlotJson(projectId, bank, slot)); });
+        sub->callback([&ctx] {
+            runner::runAction(
+                ctx, 0x14, 0x09, projectSlotJson(projectId, bank, slot));
+        });
     }
 }
