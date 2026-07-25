@@ -56,4 +56,21 @@ std::optional<ParsedResponse> parseResponse(const std::vector<uint8_t>& raw);
 // Renders a byte vector as space-separated uppercase hex, e.g. "F0 00 21 45".
 std::string toHex(const std::vector<uint8_t>& bytes);
 
+// True if resp looks like the actual reply to a request built with
+// buildMessage(requestCategory, requestCommand, ...), as opposed to an
+// unrelated unsolicited event (e.g. Preset List Change) that happened to
+// arrive first - the device doesn't guarantee ordering between the two.
+//
+// - ACK/NACK (category 0x7E) always counts, regardless of what was requested.
+// - A query request (category 0x02) gets its data reply back under category
+//   0x01 with the *same command byte* - not an echo of 0x02. This is
+//   documented explicitly for Get Location Files ("0xF0 ... 0x02 0x34 ..."
+//   request -> "0xF0 ... 0x01 0x34 ..." response) and confirmed against a
+//   real device for Get Electra Info (0x02 0x7F -> 0x01 0x7F). Getting this
+//   wrong makes every query falsely reject its own reply and wait out the
+//   full timeout instead.
+// - Anything else must echo the exact category/command sent (covers
+//   undocumented/`raw` requests where this mapping isn't known).
+bool isReplyTo(const ParsedResponse& resp, uint8_t requestCategory, uint8_t requestCommand);
+
 }  // namespace sysex

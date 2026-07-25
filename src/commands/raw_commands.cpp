@@ -58,7 +58,25 @@ void registerRawCommands(CLI::App& app, runner::Context& ctx) {
         transport.open(ctx.port, ctx.resolvedOutPortIndex(), ctx.resolvedInPortIndex());
         transport.send(msg);
 
-        auto raw = transport.waitForReply(ctx.timeoutMs);
+        // The wire format is the same for requests and responses, so
+        // re-parsing our own outgoing message tells us which category/command
+        // to expect echoed back - needed to skip past an unrelated unsolicited
+        // event (e.g. Preset List Change) that may arrive before our real
+        // reply, without mistaking it for that reply.
+        auto sent = sysex::parseResponse(msg);
+
+        std::optional<std::vector<uint8_t>> raw;
+        std::optional<sysex::ParsedResponse> parsed;
+        while (true) {
+            raw = transport.waitForReply(ctx.timeoutMs);
+            if (!raw.has_value()) break;
+            parsed = sysex::parseResponse(*raw);
+            if (!parsed.has_value()) break;  // not a well-formed Electra message; report as-is below
+            if (sent.has_value() && sysex::isReplyTo(*parsed, sent->category, sent->command)) break;
+            if (!sent.has_value()) break;  // couldn't determine what we sent; report the first reply as-is
+            // Unrelated unsolicited event - keep waiting for the real reply.
+        }
+
         if (!raw.has_value()) {
             std::cerr << "error: timed out waiting for a reply\n";
             runner::exitCode = 2;
@@ -69,7 +87,6 @@ void registerRawCommands(CLI::App& app, runner::Context& ctx) {
             runner::exitCode = 0;
             return;
         }
-        auto parsed = sysex::parseResponse(*raw);
         if (!parsed.has_value()) {
             runner::writeOutput(ctx, sysex::toHex(*raw));
             runner::exitCode = 0;

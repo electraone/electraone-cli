@@ -26,12 +26,25 @@ std::optional<sysex::ParsedResponse> sendAndReceive(const Context& ctx, uint8_t 
     auto msg = sysex::buildMessage(category, command, params, ctx.txnId);
     transport.send(msg);
 
-    auto raw = transport.waitForReply(ctx.timeoutMs);
-    if (!raw.has_value()) {
-        return std::nullopt;
+    // Many commands trigger an unsolicited notification event alongside
+    // their real reply (e.g. Upload Preset also emits a Preset List Change
+    // event) - the device doesn't guarantee which arrives first. Skip past
+    // anything that isn't actually our reply (see sysex::isReplyTo) so an
+    // unrelated event can't be mistaken for it.
+    while (true) {
+        auto raw = transport.waitForReply(ctx.timeoutMs);
+        if (!raw.has_value()) {
+            return std::nullopt;
+        }
+        auto resp = sysex::parseResponse(*raw);
+        if (!resp.has_value()) continue;  // shouldn't happen; waitForReply already filters
+
+        if (sysex::isReplyTo(*resp, category, command)) {
+            if (rawOut) *rawOut = *raw;
+            return resp;
+        }
+        // Unrelated unsolicited event - keep waiting for the real reply.
     }
-    if (rawOut) *rawOut = *raw;
-    return sysex::parseResponse(*raw);
 }
 
 }  // namespace

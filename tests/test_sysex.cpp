@@ -128,3 +128,70 @@ TEST_CASE("toHex formats bytes as space-separated uppercase hex") {
     CHECK(toHex({0xF0, 0x00, 0x21, 0x45}) == "F0 00 21 45");
     CHECK(toHex({}).empty());
 }
+
+TEST_CASE("isReplyTo: ACK/NACK always count, regardless of what was requested") {
+    ParsedResponse ack;
+    ack.isAck = true;
+    CHECK(isReplyTo(ack, 0x01, 0x01));
+    CHECK(isReplyTo(ack, 0x02, 0x7F));
+
+    ParsedResponse nack;
+    nack.isNack = true;
+    CHECK(isReplyTo(nack, 0x05, 0x01));
+}
+
+TEST_CASE("isReplyTo: a query reply comes back as category 0x01, not an echo of the request's 0x02") {
+    // Regression test: this exact case (Get Electra Info: request 0x02 0x7F,
+    // real reply 0x01 0x7F per an actual device) previously made every query
+    // reject its own reply and time out, because the check required an exact
+    // category match instead of accounting for the query (0x02) -> data
+    // reply (0x01) transform documented for Get Location Files.
+    ParsedResponse dataReply;
+    dataReply.category = 0x01;
+    dataReply.command = 0x7F;
+    CHECK(isReplyTo(dataReply, 0x02, 0x7F));
+
+    // Get Location Files: request 0x02 0x34 -> response 0x01 0x34.
+    ParsedResponse locationReply;
+    locationReply.category = 0x01;
+    locationReply.command = 0x34;
+    CHECK(isReplyTo(locationReply, 0x02, 0x34));
+}
+
+TEST_CASE("isReplyTo: an unrelated unsolicited event is not mistaken for the reply") {
+    // Preset List Change (0x7E 0x05) arriving while waiting for Upload
+    // Preset's ACK (request category 0x01, command 0x01) - the bug this
+    // whole mechanism exists to prevent.
+    ParsedResponse presetListChange;
+    presetListChange.category = 0x7E;
+    presetListChange.command = 0x05;
+    CHECK_FALSE(isReplyTo(presetListChange, 0x01, 0x01));
+
+    // Wrong command byte on an otherwise plausible data reply.
+    ParsedResponse wrongCommand;
+    wrongCommand.category = 0x01;
+    wrongCommand.command = 0x04;
+    CHECK_FALSE(isReplyTo(wrongCommand, 0x02, 0x7F));
+
+    // The 0x02 -> 0x01 transform is specific to query requests; it must not
+    // apply when the request category wasn't 0x02.
+    ParsedResponse notAQuery;
+    notAQuery.category = 0x01;
+    notAQuery.command = 0x01;
+    CHECK_FALSE(isReplyTo(notAQuery, 0x05, 0x01));
+}
+
+TEST_CASE("isReplyTo: non-query requests still require an exact category/command echo") {
+    // Covers `raw`'s escape hatch, where the reply convention for an
+    // undocumented category isn't known - fall back to requiring the exact
+    // bytes sent to be echoed back.
+    ParsedResponse exactEcho;
+    exactEcho.category = 0x11;
+    exactEcho.command = 0x22;
+    CHECK(isReplyTo(exactEcho, 0x11, 0x22));
+
+    ParsedResponse mismatch;
+    mismatch.category = 0x11;
+    mismatch.command = 0x23;
+    CHECK_FALSE(isReplyTo(mismatch, 0x11, 0x22));
+}

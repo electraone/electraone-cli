@@ -126,7 +126,21 @@ struct Client::Impl {
         if (!connected) throw std::runtime_error("electraone::Client is not connected - call connect() first");
         auto msg = sysex::buildMessage(category, command, params, options.transactionId);
         transport.send(msg);
-        return waitAndParse(timeoutMs);
+
+        // Many commands trigger an unsolicited notification event alongside
+        // their real reply (e.g. Upload Preset also emits a Preset List
+        // Change event) - the device doesn't guarantee which arrives first.
+        // Skip past anything that isn't actually our reply (see
+        // sysex::isReplyTo) so it can't be mistaken for it. (waitAndParse()
+        // itself stays a plain "wait for whatever's next" - that's what
+        // poll() needs it to be.)
+        while (true) {
+            auto resp = waitAndParse(timeoutMs);
+            if (!resp.has_value()) return std::nullopt;
+            if (sysex::isReplyTo(*resp, category, command)) {
+                return resp;
+            }
+        }
     }
 
     std::optional<Response> waitAndParse(int timeoutMs) {

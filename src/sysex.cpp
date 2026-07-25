@@ -127,4 +127,10 @@ std::string toHex(const std::vector<uint8_t>& bytes) {
     return os.str();
 }
 
+bool isReplyTo(const ParsedResponse& resp, uint8_t requestCategory, uint8_t requestCommand) {
+    if (resp.isAck || resp.isNack) return true;
+    if (requestCategory == 0x02 && resp.category == 0x01 && resp.command == requestCommand) return true;
+    return resp.category == requestCategory && resp.command == requestCommand;
+}
+
 }  // namespace sysex
