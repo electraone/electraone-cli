@@ -269,11 +269,10 @@ For the common case of uploading a single file, use the composite `upload`
 command. It performs the entire transaction automatically:
 
 ```bash
-electraone files upload my-script.lua \
-  --location slots \
-  --type luaModule \
-  --namespace mymodule \
-  --path init
+electraone files upload firmware-mk2-v4.1.4.srec \
+  --location updates \
+  --type firmware \
+  --chunk-size 32768
 
 electraone files upload my-preset.json \
   --location slots \
