@@ -96,22 +96,6 @@ ctest --test-dir build --output-on-failure
 or run `./build/electraone_tests` directly for doctest's own output (`--help`
 for its filtering/reporting options).
 
-## Formatting
-
-Source formatting is enforced by [.clang-format](.clang-format) (based on the
-Google style, 4-space indent, 110-column limit) and applied with
-[clang-format](https://clang.llvm.org/docs/ClangFormat.html) via a small
-top-level `Makefile` - this is a separate, lightweight helper, not the
-project's build system (that's still CMake):
-
-```bash
-make format        # reformat src/, include/, tests/, and examples/ in place
-make format-check  # fail (without changing anything) if anything isn't formatted - for CI
-```
-
-`clang-format` needs to be installed and on `PATH` (e.g. `brew install
-clang-format`, `apt install clang-format`, or bundled with LLVM on Windows).
-
 ## Connecting
 
 Once the command line tool is built, you can use it to interact wih the
