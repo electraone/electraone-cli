@@ -28,47 +28,13 @@
 #include <sstream>
 #include <vector>
 
-#ifdef _WIN32
-#define NOMINMAX
-#include <io.h>
-#include <windows.h>
-#else
-#include <sys/ioctl.h>
-#include <unistd.h>
-#endif
+#include "commands/terminal.hpp"
 
 namespace commands
 {
 
     namespace
     {
-
-        bool stdoutIsTerminal()
-        {
-#ifdef _WIN32
-            return _isatty(_fileno(stdout)) != 0;
-#else
-            return isatty(fileno(stdout)) != 0;
-#endif
-        }
-
-        size_t terminalWidth()
-        {
-#ifdef _WIN32
-            CONSOLE_SCREEN_BUFFER_INFO info;
-            if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE),
-                                           &info)) {
-                return static_cast<size_t>(info.srWindow.Right
-                                           - info.srWindow.Left + 1);
-            }
-            return 80;
-#else
-            struct winsize w{};
-            if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0 && w.ws_col > 0)
-                return w.ws_col;
-            return 80;
-#endif
-        }
 
         // Renders a scalar (string/number/bool/null) without JSON string quoting.
         std::string scalarText(JsonVariantConst v)
@@ -235,7 +201,7 @@ namespace commands
             for (JsonVariantConst v : arr)
                 items.push_back(scalarText(v));
 
-            if (!stdoutIsTerminal()) {
+            if (!isStdoutTerminal()) {
                 for (const auto &s : items)
                     os << pad << s << "\n";
                 return;

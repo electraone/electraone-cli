@@ -327,6 +327,20 @@ Files are transferred in smaller chunks. Use `--chunk-size` to control the
 amount of file data included in each transfer-chunk message. The default chunk
 size is 256 bytes.
 
+### Upload progress
+
+While sending chunks, `files upload` shows a progress bar that updates in
+place:
+
+```
+[================>             ]  52% 14000/26682 bytes
+```
+
+The bar only appears when stdout is an actual terminal - if the output is
+redirected or piped, nothing is printed per chunk (the MD5/step/summary lines
+around the transfer are still shown either way). Pass `--no-progress` to
+suppress the bar entirely, even on a terminal.
+
 ### Commit timeout
 
 During the commit step, the controller validates the MD5 checksum of every file

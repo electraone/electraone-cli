@@ -107,6 +107,8 @@ add_executable(electraone
   src/midi_transport.cpp
   src/commands/runner.cpp
   src/commands/human_format.cpp
+  src/commands/terminal.cpp
+  src/commands/progress.cpp
   src/commands/event_decoder.cpp
   src/commands/info_commands.cpp
   src/commands/preset_commands.cpp
@@ -170,6 +172,8 @@ if(ELECTRAONE_BUILD_TESTS AND CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR
     tests/test_sysex.cpp
     tests/test_md5.cpp
     tests/test_describe_event.cpp
+    tests/test_progress.cpp
+    src/commands/progress.cpp
   )
   target_include_directories(electraone_tests PRIVATE src)
   target_link_libraries(electraone_tests PRIVATE electraone_api doctest::doctest)

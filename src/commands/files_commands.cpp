@@ -25,6 +25,8 @@
 #include "commands/command.hpp"
 #include "commands/common.hpp"
 #include "commands/event_decoder.hpp"
+#include "commands/progress.hpp"
+#include "commands/terminal.hpp"
 #include "md5.hpp"
 
 // File Transfer SysEx API (firmware 4.0+): https://docs.electra.one/developers/filetransfer.html
@@ -224,6 +226,7 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
         static int bank = 0, slot = 0, id = 1, chunkSize = 256,
                    commitTimeoutMs = 60000;
         static bool allowBinary = false;
+        static bool noProgress = false;
         auto *sub = files->add_subcommand(
             "upload",
             "Upload a file end-to-end: open + register + send all chunks + commit, in one transaction");
@@ -263,6 +266,9 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
                "Reply timeout for the final commit in milliseconds, independent of --timeout (on-device "
                "MD5 validation can take much longer than opening/registering/sending chunks)")
             ->default_val(60000);
+        sub->add_flag("--no-progress",
+                      noProgress,
+                      "Suppress the progress bar shown while sending chunks");
 
         sub->callback([&ctx, bankOpt, slotOpt, nsOpt, pathOpt] {
             auto content = runner::readFileOrStdin(file);
@@ -299,6 +305,13 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
             if (runner::exitCode != 0)
                 return;
 
+            // A live-updating bar only makes sense on a real terminal; with
+            // --no-progress, or when stdout is redirected/piped, print
+            // nothing per-chunk at all (rather than falling back to the old
+            // one-line-per-chunk spam) - the MD5/step/summary lines around
+            // this loop are enough to follow along either way.
+            bool showProgress = !noProgress && commands::isStdoutTerminal();
+
             size_t sent = 0;
             while (sent < content.size()) {
                 size_t len = std::min(static_cast<size_t>(chunkSize),
@@ -308,14 +321,23 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
                                    content.begin() + static_cast<long>(sent),
                                    content.begin()
                                        + static_cast<long>(sent + len));
+                // Report Progress events aren't surfaced here (unlike
+                // `files send-chunk`) - they'd print a line in between our
+                // own in-place bar updates and break it up.
                 runner::runActionAwaitingAck(
-                    ctx, 0x01, 0x2F, chunkParams, printProgress);
+                    ctx, 0x01, 0x2F, chunkParams, nullptr);
                 if (runner::exitCode != 0)
                     return;
                 sent += len;
-                std::cout << "sent " << sent << "/" << content.size()
-                          << " bytes\n";
+                if (showProgress) {
+                    std::cout
+                        << "\r"
+                        << commands::formatProgressBar(sent, content.size())
+                        << std::flush;
+                }
             }
+            if (showProgress)
+                std::cout << "\n";
 
             std::cout << "Committing...\n";
             JsonDocument doc;

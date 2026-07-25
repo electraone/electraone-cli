@@ -44,8 +44,7 @@ int main()
      * finds the CTRL port by name; see ConnectOptions to override
      */
     try {
-        client
-            .connect();
+        client.connect();
     } catch (const std::exception &e) {
         std::cerr << "connect failed: " << e.what() << "\n";
         return 1;
