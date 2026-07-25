@@ -1,94 +1,203 @@
-# electraone
+# electraone-cli
 
-A cross-platform command-line suite *and* C++ client library for the Electra One SysEx protocol — [core implementation](https://docs.electra.one/developers/midiimplementation.html) and [File Transfer API](https://docs.electra.one/developers/filetransfer.html) — built on RtMidi. Every documented SysEx command is exposed both as a CLI subcommand and as a C++ method, talking to the Electra One's **CTRL** MIDI port.
+A cross-platform command-line suite and C++ client library for the Electra One
+SysEx protocol:
+
+- [Electra Core SysEx implementation](https://docs.electra.one/developers/midiimplementation.html)
+- [File Transfer API](https://docs.electra.one/developers/filetransfer.html)
+
+The library and command-line tool provide programmatic access to all Electra One
+SysEx commands. They can be used to manage the controller from the command line
+and to develop software applications that communicate with it without having to
+implement the underlying MIDI and SysEx communication details.
+
+A small demo application is included to demonstrate how to use the C++ client
+library.
 
 ## Building
 
-Requires CMake 3.16+ and a C++17 compiler. Dependencies (RtMidi, CLI11, ArduinoJson) are picked up via `find_package` if already installed, otherwise fetched from source and built (as a static library, so the results below are self-contained - no `.dll`/`.so`/`.dylib` to keep alongside the binaries) automatically at configure time. The same two commands build everything - the CLI, the C++ library, and the example - on macOS, Linux, and Windows:
+In order to build the application and the library the following dependencies
+are required:
+
+- CMake 3.16+
+- C++17 compiler
+- RtMidi
+- CLI11
+- ArduinoJson
+
+RtMidi, CLI11, and ArduinoJson are picked up via `find_package` if already
+installed, otherwise fetched from source and built (as a static library)
+
+The binaries can be build on all platforms (Lunix, MacOs, Windows) using:
 
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
-This produces `build/electraone` (the CLI), `build/libelectraone.a` (the C++ client library - see [C++ API library](#c-api-library) below), and `build/basic_usage` (the example - set `-DELECTRAONE_BUILD_EXAMPLES=OFF` to skip it). Exact output paths/names differ slightly per platform (see below).
+This produces:
+
+- `build/electraone` - the command line application (CLI)
+- `build/libelectraone.a` - the C++ client library, see [C++ API library](#c-api-library) below
+- `build/basic_usage` - the example - set `-DELECTRAONE_BUILD_EXAMPLES=OFF` to skip it
+
+Exact output paths / names differ slightly per platform.
 
 ### Prerequisites per platform
 
-**macOS** — Xcode Command Line Tools (`xcode-select --install`) for a C++17 compiler; CMake (`brew install cmake`, or the [cmake.org](https://cmake.org/download/) installer); Git (for `FetchContent` to clone dependencies at configure time, comes with Xcode CLT). RtMidi builds against **CoreMIDI/CoreAudio/CoreFoundation**, already part of macOS - nothing else to install. This is the platform this project has actually been built and run against (including live against real hardware); Linux and Windows below are supported by design and code review, not yet build-verified here.
+#### Linux
 
-**Linux** — a C++17 compiler and CMake (Debian/Ubuntu: `sudo apt install build-essential cmake git`; Fedora: `sudo dnf install gcc-c++ cmake git`). RtMidi's Linux backend needs **ALSA development headers** to build a working MIDI backend: `sudo apt install libasound2-dev` (Debian/Ubuntu) or `sudo dnf install alsa-lib-devel` (Fedora/RHEL). Without these, CMake's own configure step will print `Could NOT find ALSA` and RtMidi will build without a real MIDI backend - install them *before* running `cmake -B build` (delete `build/` and reconfigure if you installed them afterward, since FetchContent's RtMidi detection runs once at configure time).
+A C++17 compiler and CMake are required. RtMidi's Linux backend needs
+ALSA development headers to build a working MIDI backend:
 
-**Windows** — Visual Studio 2022 (the free Community edition works) with the **"Desktop development with C++"** workload, which provides MSVC, the Windows SDK (so RtMidi's **WinMM** backend is available with nothing extra to install), and CMake integration. Also install Git if the VS installer didn't already put it on `PATH` (needed for `FetchContent`). Build from a "Developer Command Prompt for VS 2022" or via VS's built-in CMake support:
+`sudo apt install libasound2-dev` (Debian/Ubuntu) or
+`sudo dnf install alsa-lib-devel` (Fedora/RHEL).
+
+Without these, CMake's own configure step will print `Could NOT find ALSA` and
+RtMidi will build without a real MIDI backend. Install them before running
+`cmake -B build`. Delete `build/` and reconfigure if you installed them
+afterward, since FetchContent's RtMidi detection runs once at configure time.
+
+#### macOS
+
+Xcode Command Line Tools (`xcode-select --install`) for a C++17 compiler,
+CMake (`brew install cmake`, or the [cmake.org](https://cmake.org/download/)
+installer). RtMidi builds against CoreMIDI/CoreAudio/CoreFoundation, which
+already is part of macOS.
+
+#### Windows
+
+Visual Studio 2022 (the free Community edition works) with the
+"Desktop development with C++", which provides MSVC, the Windows
+SDK, and CMake integration. Also install and configure Git if the VS installer
+didn't already put it on `PATH`.
+
+Build from a "Developer Command Prompt for VS 2022" or via VS's built-in CMake
+support:
 
 ```
 cmake -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
 ```
 
-(Visual Studio is a multi-config generator, so binaries land in `build\Release\` rather than directly in `build\`, e.g. `build\Release\electraone.exe`.) If you'd rather use MinGW-w64/GCC instead of MSVC, that should also work (RtMidi supports it) via `cmake -B build -G "MinGW Makefiles"` from an MSYS2/MinGW shell, but MSVC is the better-tested path for this project.
-
-Every platform's example (`basic_usage`) builds automatically via the commands above - no manual linking needed on any of them. macOS/Linux also have [examples/Makefile](examples/Makefile) as an optional quick single-file rebuild once the library exists; it's not used on Windows (see the comment at its top).
-
 ## Testing
 
-`cmake --build build` also builds `electraone_tests` (skip with `-DELECTRAONE_BUILD_TESTS=OFF`), covering the `electraone_api` library's hardware-independent logic with [doctest](https://github.com/doctest/doctest): the SysEx envelope encode/decode in [sysex.cpp](include/electraone/sysex.hpp) (`encode14bit`/`encode28bit`/`encodeAscii`/`buildMessage`/`parseResponse`, including malformed input and the transaction-id framing), the [MD5](src/md5.hpp) implementation `uploadFile`'s Commit step relies on (checked against RFC 1321 test vectors), and `electraone::describeEvent` (every event type, including the two documented byte-collisions noted below). `Client`'s command methods themselves aren't unit tested, since they need a live MIDI connection rather than being pure logic - that's what [examples/basic_usage.cpp](examples/basic_usage.cpp) exercises by hand against real hardware.
+`cmake --build build` also builds `electraone_tests`
+(it can be skipped with `-DELECTRAONE_BUILD_TESTS=OFF`), covering the
+`electraone_api` library's hardware-independent logic with
+[doctest](https://github.com/doctest/doctest).
+
+To run the tests issue:
 
 ```bash
 ctest --test-dir build --output-on-failure
 ```
 
-or run `./build/electraone_tests` directly for doctest's own output (`--help` for its filtering/reporting options).
-
-[.github/workflows/ci.yml](.github/workflows/ci.yml) runs the same configure/build/test sequence on GitHub Actions across `ubuntu-latest`, `macos-latest`, and `windows-latest` on every push and pull request - the tests don't touch real hardware, so this works unattended. As with the rest of this README, macOS is the platform this has actually been run on locally; Linux and Windows are exercised by CI itself once pushed, which is the point of having it there.
+or run `./build/electraone_tests` directly for doctest's own output (`--help`
+for its filtering/reporting options).
 
 ## Connecting
+
+Once the command line tool is built, you can use it to interact wih the
+Electra One hardware controller. The first step is to review the MIDI ports:
 
 ```bash
 electraone list-ports
 ```
 
-lists all MIDI input/output ports. By default every command connects to the port whose name contains `CTRL` (case-insensitive) — on most systems that's `Electra Controller Electra CTRL`, found automatically with no configuration. Override with:
+The command lists all MIDI input/output ports available on the host computer.
+By default, every command connects to the port whose name contains `CTRL`
+(case-insensitive). In general, this will work on Linux and MacOs.
+
+If the default `CTRL` port does not work, specify the Electra One control port
+using the command line parameters:
 
 - `--port <substring>` — match a different substring
-- `--port-index <n>` — use a specific port index (same one for both output and input) from `list-ports` directly, bypassing name matching
-- `--out-port-index <n>` / `--in-port-index <n>` — override `--port-index` for just the output or input side
+- `--port-index <n>` — use a specific port index (same one for both output and
+  input) from `list-ports` directly, bypassing name matching
+- `--out-port-index <n>` / `--in-port-index <n>` — override `--port-index` for
+  just the output or input side
 
-**Windows note**: WinMM's port names never contain `CTRL` (they're generic, e.g. `MIDIOUT3 (Electra Controller)`), so name matching always fails there and `--port-index` (or the pair above) is required. Windows also commonly lists an extra software-only output port (e.g. `Microsoft GS Wavetable Synth`) ahead of any real devices, with no matching input port — which shifts every subsequent output index one higher than the same device's input index. Run `list-ports` and compare: if the Electra's output and input entries land at different positions, use `--out-port-index`/`--in-port-index` instead of `--port-index` to address them independently.
+**Windows note**: WinMM's port names may not contain `CTRL` (they're generic,
+e.g. `MIDIOUT3 (Electra Controller)`), so name matching always fails there and
+`--port-index` (or the pair above) is required. Windows also commonly lists an
+extra software-only output port (e.g. `Microsoft GS Wavetable Synth`) ahead of
+any real devices, with no matching input port. That shifts every subsequent
+output index one higher than the same device's input index. Run `list-ports`
+and compare: if the Electra's output and input entries land at different
+positions, use `--out-port-index`/`--in-port-index` instead of `--port-index`
+to address them independently.
 
-Other global options (must be given before the subcommand name):
+## Global options
+
+Besides the options to specify connection ports, there is a handful of other
+global options. The global options must be given before the subcommand name.
+They are:
 
 - `--timeout <ms>` — reply wait timeout, default 3000
-- `--txn-id <n>` — attach an optional 14-bit transaction ID to the request (firmware 4.0+)
+- `--txn-id <n>` — attach an optional 14-bit transaction ID to the request
+  (firmware 4.0+)
 - `-o, --output <file>` — write the response to a file instead of stdout
 - `--raw` — print the raw response bytes as hex instead of decoding
-- `--pretty` — pretty-print JSON responses with indentation for human reading (non-JSON payloads, e.g. Lua source, are printed unchanged; has no effect together with `--raw`)
-- `--human` — render JSON responses for human reading rather than as JSON at all: objects print as an indented tree that preserves the JSON's own key/value structure, and arrays (top-level or nested under a key, e.g. `preset list`'s `presets` field) print `ls`-style - a column-aligned table when the elements are objects, a terminal-width-aware multi-column grid when they're scalars (falling back to one-per-line when stdout isn't a terminal, like `ls` piped to a file). Non-JSON payloads are printed unchanged. Takes precedence over `--pretty`; no `-h` short form since that's already `--help` on every subcommand.
+- `--pretty` — pretty-print JSON responses with indentation for human reading
+  (non-JSON payloads, e.g. Lua source, are printed unchanged; has no effect
+  together with `--raw`)
+- `--human` — render JSON responses for human reading rather than as JSON.
+  It akes precedence over `--pretty`; no `-h` short form since that's already
+  `--help` on every subcommand.
 
-Exit codes: `0` success/ACK, `1` NACK, `2` timeout or transport/protocol error, `3` CLI usage error.
+## Exit codes
+
+The command line tool completes the its task it returns an exit code depending
+on the result of the task.
+
+Exit codes:
+
+- `0` ACK (success)
+- `1` NACK (failure)
+- `2` timeout or transport/protocol error
+- `3` CLI usage error
+
+## Transactions
+
+Any command that changes the state or data on the controller can be associated
+with a transaction ID. The primary purpose of transaction IDs is to link an
+ACK/NACK response to the original request.
+
+Transaction IDs are 14-bit numbers. The host is responsible for generating them
+and ensuring their uniqueness.
+
+Data requests, such as list and information queries, do not support transaction
+IDs.
 
 ## Command groups
 
-Run `electraone <group> --help` or `electraone <group> <subcommand> --help` for full details.
+Run `electraone <group> --help` or `electraone <group> <subcommand> --help` for
+full details about command and their sub-commands.
 
-| Group | Subcommands |
-|---|---|
-| (top-level) | `list-ports`, `info`, `runtime-info`, `reboot`, `debug enable\|disable`, `midi-learn enable\|disable\|listen`, `usb-devices list` |
-| `preset` | `get`, `upload <file>`, `remove`, `clear-slot`, `list`, `slot-info`, `switch`, `set-slot`, `reload`, `load-preloaded` |
-| `lua` | `get`, `upload <file>`, `remove`, `exec <code>\|--file` |
-| `overrides` | `get`, `upload <file>` |
-| `persisted` | `get`, `upload <file>` |
-| `performance` | `get`, `upload <file>` |
-| `config` | `get`, `upload <file>`, `remove` |
-| `snapshot` | `list`, `get`, `update`, `remove`, `swap`, `set-slot` |
-| `capture` | `list`, `get`, `update`, `remove`, `swap`, `set-slot` (see ambiguity note below) |
-| `control` | `update`, `override-text` |
-| `ui` | `page-switch`, `control-set-switch`, `bottom-bar-text` |
-| `events` | `set-port`, `subscribe`, `listen` |
-| `logger` | `enable`, `disable`, `set-port`, `listen` |
-| `window` | `stop`, `resume` |
-| `files` | `open`, `register`, `send-chunk`, `commit`, `list`, `remove`, `upload <file>` (composite) — see below |
-| `raw` | escape hatch: send an arbitrary category/command/payload or a literal hex byte string |
+| Group          | Subcommands                                                                                                           |
+| -------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `list-ports`   |                                                                                                                       |
+| `info`         |                                                                                                                       |
+| `runtime-info` |                                                                                                                       |
+| `reboot`       |                                                                                                                       |
+| `debug`        | `enable`, `disable`                                                                                                   |
+| `midi-learn`   | `enable`, `disable`, `listen`                                                                                         |
+| `usb-devices`  | `list`                                                                                                                |
+| `preset`       | `get`, `upload <file>`, `remove`, `clear-slot`, `list`, `slot-info`, `switch`, `set-slot`, `reload`, `load-preloaded` |
+| `lua`          | `get`, `upload <file>`, `remove`, `exec <code>\|--file`                                                               |
+| `overrides`    | `get`, `upload <file>`                                                                                                |
+| `persisted`    | `get`, `upload <file>`                                                                                                |
+| `performance`  | `get`, `upload <file>`                                                                                                |
+| `config`       | `get`, `upload <file>`, `remove`                                                                                      |
+| `snapshot`     | `list`, `get`, `update`, `remove`, `swap`, `set-slot`                                                                 |
+| `capture`      | `list`, `get`, `update`, `remove`, `swap`, `set-slot`                                                                 |
+| `control`      | `update`, `override-text`                                                                                             |
+| `ui`           | `page-switch`, `control-set-switch`, `bottom-bar-text`                                                                |
+| `events`       | `set-port`, `subscribe`, `listen`                                                                                     |
+| `logger`       | `enable`, `disable`, `set-port`, `listen`                                                                             |
+| `window`       | `stop`, `resume`                                                                                                      |
+| `files`        | `open`, `register`, `send-chunk`, `commit`, `list`, `remove`, `upload <file>` (composite) — see below                 |
 
 ### Examples
 
@@ -98,116 +207,365 @@ electraone --pretty preset list
 electraone --human preset list
 electraone preset get --bank 0 --slot 1
 electraone preset upload my-preset.json
-electraone snapshot list --project-id abc123
+electraone snapshot list --project-id nljaziUjglOuD1fe15Eq
 electraone lua exec "print('hello')"
 electraone control update --id 42 --value 100
 electraone events listen --pots --touch --duration 30
-electraone raw --category 0x02 --command 0x7F
 ```
 
-File arguments accept `-` to read from stdin, e.g. `cat preset.json | electraone preset upload -`.
+File arguments accept `-` to read from stdin,
+e.g. `cat preset.json | electraone preset upload -`.
 
 ### Listening
 
-`events listen`, `logger listen`, and `midi-learn listen` all print incoming messages as `[HH:MM:SS.mmm] <description>` - a host-side wall-clock timestamp on every line, not just log text, so a live stream stays easy to read chronologically regardless of which kind of line it is. `logger listen` subscribes to controller events in addition to enabling the logger (same `--page`/`--control-set`/`--usb-host`/`--pots`/`--touch`/`--button`/`--window`/`--all` flags as `events listen`, defaulting to all event types), so you see Pot Touch/Page Switch/etc. interleaved with log messages in one stream instead of having to run two terminals:
+The command line not only sends commands to the Electra One controller. It can
+also listen to events and log messages that the controller emits.
+
+The commands to listen are:
+
+- `events listen`
+- `logger listen`
+- `midi-learn listen`
+
+All listen commands print incoming messages as `[HH:MM:SS.mmm] <description>`,
+where the timestamp is a host-side wall-clock timestamp on every line and
+the `<description>` is the message or event sent by the controller.
+
+`logger listen` subscribes to controller events in addition to enabling the
+logger (same `--page` `--control-set` `--usb-host` `--pots` `--touch`
+`--button` `--window` `--all` flags as `events listen`, defaulting to all event
+types), so you see Pot Touch / Page Switch / etc. interleaved with log messages
+in one stream instead of having to run two terminals:
 
 ```bash
 electraone logger listen --duration 30
 electraone logger listen --pots --touch  # log messages + just these event types
 ```
 
-`--timeout` doesn't apply to `listen` commands - that's for one-shot request/reply commands, where a slow reply usually means something's wrong. `listen` is inherently open-ended: with no `--duration`, it waits indefinitely (including for the initial enable/subscribe handshake) until Ctrl+C, and with `--duration N` it gives up on the whole thing - handshake included - once N seconds have passed, printing a `--duration elapsed` error if the handshake itself never got a reply in that window.
+`--timeout` option does not apply to `listen` commands. `listen` is inherently
+open-ended. With no `--duration` option specified, it waits indefinitely
+until Ctrl+C, and with `--duration N` it gives up once N seconds have passed.
 
 ## File Transfer API (`files`)
 
-The [File Transfer API](https://docs.electra.one/developers/filetransfer.html) (firmware 4.0+) uploads/lists/removes files stored on the device, using an atomic transaction: open a cache, register one or more files with their size, stream each one in chunks, then commit with an MD5 checksum per file — the device verifies every checksum and either applies all files or rejects the whole transaction.
+The [File Transfer API](https://docs.electra.one/developers/filetransfer.html),
+available in firmware 4.0 and later, supports uploading, listing, and removing
+files stored on the controller.
 
-For the common case of uploading a single file, use the composite command — it runs the whole transaction for you:
+File uploads use an atomic transaction:
+
+1. Open a cache.
+2. Register one or more files and specify their sizes.
+3. Transfer each file in chunks.
+4. Commit the transaction with an MD5 checksum for each file.
+
+During the commit step, the controller verifies the checksums of all transferred
+files. It then either applies every file in the transaction or rejects the entire
+transaction.
+
+### Uploading a single file
+
+For the common case of uploading a single file, use the composite `upload`
+command. It performs the entire transaction automatically:
 
 ```bash
-electraone files upload my-script.lua --location slots --type luaModule --namespace mymodule --path init
-electraone files upload my-preset.json --location slots --type preset --bank 0 --slot 1
+electraone files upload my-script.lua \
+  --location slots \
+  --type luaModule \
+  --namespace mymodule \
+  --path init
+
+electraone files upload my-preset.json \
+  --location slots \
+  --type preset \
+  --bank 0 \
+  --slot 1
 ```
 
-`--location` is one of `slots`, `updates`, `assets`, `modules`, `presets`, `root`; `--type` is one of `firmware`, `bootloader`, `preset`, `lua`, `luaModule`, `ui`, `config`, `deviceList`, `datafile`, `performance`. Pass `--bank`/`--slot` for `slots` locations, or `--namespace`/`--path` for `modules`/`presets` locations, per the destination's requirements. `--id` (default 1) only needs to be unique within one transaction; `--chunk-size` (default 256 bytes) controls how much file data goes in each Transfer Chunks message.
+### File locations
 
-Commit validates every file's MD5 on-device before applying anything, which can take much longer than any other command for a large file - `--commit-timeout` (default 60000ms) covers just that final step, independent of the general `--timeout` (which still applies to opening, registering, and each chunk, so those still fail fast if something's actually wrong). Bump `--commit-timeout` further if a commit still times out on a very large file. The low-level `files commit` subcommand takes the same option.
+The `--location` option specifies where the file will be stored:
 
-The low-level primitives (`files open`, `files register`, `files send-chunk`, `files commit`, `files list`, `files remove`) are also exposed individually, e.g. for scripting a multi-file transaction (`open` once, `register` + `send-chunk` per file, one `commit` with a hand-written JSON `files[]` array covering all of them) or for debugging.
+- `slots` — preset slots that users can navigate from the controller UI
+- `updates` — staging area for updates applied during the next reboot
+- `assets` — UI assets, fonts, and related files
+- `modules` — preloaded Lua modules
+- `presets` — preloaded presets
 
-**Chunk encoding caveat**: the docs describe Transfer Chunks' payload only as "MIDI 7-bit encoded," without specifying a bit-packing algorithm for arbitrary 8-bit bytes. Consistent with every other payload in the protocol (which is literal ASCII/7-bit, no packing), `files upload`/`files send-chunk` send each source byte as-is and reject the file up front if any byte is ≥ 0x80. That covers the realistic cases — Lua scripts, JSON presets/config/deviceList, datafiles — since they're text already. For genuinely binary content (`firmware`/`bootloader`), pass `--allow-binary` to bypass that check; bytes are still sent unpacked, so on real binary data this will most likely fail with an MD5 mismatch at commit rather than corrupting anything (commit is atomic and verifies MD5 before applying), but there's no verified packing scheme to fall back to. If you find the real one, it belongs in `sendChunk`/`upload` in [files_commands.cpp](src/commands/files_commands.cpp).
+### File types
+
+The `--type` option specifies the type of file being uploaded:
+
+- `firmware` — Electra One firmware
+- `bootloader` — Electra One bootloader; use this type with caution
+- `preset` — preset JSON file
+- `lua` — preset Lua source file
+- `luaModule` — shared Lua module that can be used by preset Lua scripts
+- `ui` — UI asset file
+- `config` — controller configuration JSON file
+- `deviceList` — JSON file containing device override definitions
+- `datafile` — JSON file containing persistent data generated by a Lua script
+- `performance` — performance JSON file
+
+### Destination addressing
+
+Different locations use different destination addressing schemes:
+
+- Preset `slots` are identified by `--bank` and `--slot`, using 0-based index.
+- Preloaded `modules` and `presets` are identified by `--namespace` and
+  `--path`. The namespace is the top-level directory, typically named after the
+  maintainer. The path identifies a file or subdirectory within that namespace.
+
+### Multi-file transactions
+
+When transferring multiple files in a single transaction, each file must be
+assigned an identifier with `--id`.
+
+The identifier defaults to `1` and only needs to be unique within the current
+transaction.
+
+Files are transferred in smaller chunks. Use `--chunk-size` to control the
+amount of file data included in each transfer-chunk message. The default chunk
+size is 256 bytes.
+
+### Commit timeout
+
+During the commit step, the controller validates the MD5 checksum of every file
+before applying any changes. For large files, this step can take significantly
+longer than other commands.
+
+The `--commit-timeout` option controls the timeout for the commit step only. Its
+default value is 60,000 ms, and it is independent of the general `--timeout`
+option.
+
+### Low-level commands
+
+The following low-level commands are available:
+
+- `files open`
+- `files register`
+- `files send-chunk`
+- `files commit`
+- `files list`
+- `files remove`
+
+are exposed individually, e.g. for scripting a multi-file transaction.
 
 ## C++ API library
 
-`electraone_api` builds `libelectraone.a` plus a public header at `include/electraone/` (`ElectraOneClient.hpp` and `sysex.hpp`) — a C++ client for the same protocol the CLI implements, for embedding directly in a 3rd-party application instead of shelling out to the CLI. It has no CLI11 dependency; its public header only needs the STL. RtMidi is still required at link time (see below), but nothing about it leaks into the public API.
+The `electraone-cli` repository also builds `libelectraone.a`, a static C++
+library that provides programmatic access to the same Electra One SysEx protocol
+used by the CLI.
+
+The public headers are located in `include/electraone/`:
+
+- `ElectraOneClient.hpp` — high-level client API
+- `sysex.hpp` — lower-level SysEx types and utilities
+
+The library is intended for embedding Electra One support directly into
+third-party applications.
+
+The public API depends only on the C++ Standard Library. RtMidi is required when
+linking the application, but RtMidi types and implementation details are not
+exposed through the public API.
+
+### Basic usage
 
 ```cpp
 #include <electraone/ElectraOneClient.hpp>
 
 electraone::Client client;
-client.connect();                                   // throws std::runtime_error on failure
+client.connect();  // Throws std::runtime_error on failure.
 
 auto info = client.getElectraInfo();
-if (!info)               { /* timed out */ }
-else if (info->isNack)   { /* device rejected the request */ }
-else                      std::cout << info->payloadAsText();  // JSON text
+
+if (!info) {
+    // The controller did not reply before the timeout.
+} else if (info->isNack) {
+    // The controller rejected the request.
+} else {
+    std::cout << info->payloadAsText();  // JSON response.
+}
 
 client.switchPage(2);
 
-electraone::UploadFileOptions opts;
-opts.location = "slots";
-opts.type = "preset";
-opts.bank = 0;
-opts.slot = 1;
-client.uploadFile(fileBytes, opts);  // throws on failure
+electraone::UploadFileOptions options;
+options.location = "slots";
+options.type = "preset";
+options.bank = 0;
+options.slot = 1;
+
+client.uploadFile(fileBytes, options);  // Throws on failure.
 ```
 
-Every command method returns `std::optional<Response>` (`Response` is an alias for `sysex::ParsedResponse`): `std::nullopt` means the device didn't reply within the timeout; otherwise check `.isNack`/`.isAck` and `.payloadAsText()`/`.payload`. `Client::send(category, command, params)` is the same low-level escape hatch as the CLI's `raw` command. `Client::poll(timeoutMs)` waits for the next incoming message without sending anything, for consuming unsolicited events after `subscribeEvents`/`enableLogger` — pair it with the free function `electraone::describeEvent(response)` for a human-readable rendering. `uploadFile` runs the whole open+register+chunk+commit File Transfer transaction and throws `std::runtime_error` naming the failed step; the same `--allow-binary` caveat from the CLI applies (see `UploadFileOptions::allowBinary`). Commit validates MD5 on-device and can take much longer than any other command for a large file, so it gets its own generous default timeout independent of `ConnectOptions::timeoutMs` - see `UploadFileOptions::commitTimeoutMs` (default 60s) and `Client::commitTransaction`'s own `timeoutMs` parameter if calling it directly. The full method list mirrors the [command groups table](#command-groups) above — see [ElectraOneClient.hpp](include/electraone/ElectraOneClient.hpp) for exact signatures, and [examples/basic_usage.cpp](examples/basic_usage.cpp) for a runnable example, buildable with its own [Makefile](examples/Makefile):
+### Responses and timeouts
+
+Command methods return `std::optional<Response>`, where `Response` is an alias
+for `sysex::ParsedResponse`.
+
+The return value should be interpreted as follows:
+
+- `std::nullopt` — the controller did not reply before the timeout
+- `response.isAck` — the controller accepted the request
+- `response.isNack` — the controller rejected the request
+- `response.payloadAsText()` — returns the response payload as text
+- `response.payload` — provides access to the raw payload bytes
+
+### Receiving unsolicited events
+
+Use `Client::poll(timeoutMs)` to wait for the next incoming message without
+sending a request.
+
+This is useful after enabling event streams with methods such as
+`subscribeEvents()` or `enableLogger()`.
+
+The function describeEvent
+
+```cpp
+electraone::describeEvent(response)
+```
+
+converts an event response into a human-readable description.
+
+### Uploading files
+
+`Client::uploadFile()` performs the complete File Transfer API transaction:
+
+1. Open the transfer cache.
+2. Register the file.
+3. Send the file in chunks.
+4. Commit the transaction.
+
+If any step fails, the method throws `std::runtime_error`. The exception message
+identifies the failed step.
+
+During the commit step, the controller validates the file's MD5 checksum before
+applying it. This can take significantly longer than other commands,
+particularly for large files.
+
+For that reason, file uploads have a separate commit timeout:
+
+```cpp
+UploadFileOptions::commitTimeoutMs
+```
+
+The default value is 60 seconds, and it is independent of
+`ConnectOptions::timeoutMs`.
+
+When using the low-level transfer API directly, `Client::commitTransaction()`
+also accepts its own `timeoutMs` parameter.
+
+### API reference and example
+
+The C++ API mirrors the [command groups](#command-groups) provided by the CLI.
+
+See the following files for more information:
+
+- [ElectraOneClient.hpp](include/electraone/ElectraOneClient.hpp) — complete API
+  signatures
+- [basic_usage.cpp](examples/basic_usage.cpp) — runnable example
+- [examples/Makefile](examples/Makefile) — standalone example build
+
+Build the library and run the example with:
 
 ```bash
-cmake -B build && cmake --build build   # builds libelectraone.a
-cd examples && make && ./basic_usage
+cmake -B build
+cmake --build build
+
+cd examples
+make
+./basic_usage
 ```
 
-**Linking**: from another CMake project, the simplest path is `add_subdirectory` (or `FetchContent`) this repo and `target_link_libraries(your_app PRIVATE electraone_api)` — RtMidi (statically linked, see [Prerequisites per platform](#prerequisites-per-platform) above) and its system MIDI backend (CoreMIDI/ALSA/WinMM) come along transitively, no further configuration needed. This is also how `basic_usage` itself is built (see its `add_executable`/`target_link_libraries` calls in [CMakeLists.txt](CMakeLists.txt)) - copy that pattern for your own app.
+### Linking with CMake
 
-Without CMake, link `libelectraone.a` plus RtMidi's static archive plus the platform's MIDI libraries directly:
+The recommended way to use the library from another CMake project is to include
+this repository with `add_subdirectory()` or `FetchContent`, and then link
+against the `electraone_api` target:
+
+```cmake
+target_link_libraries(your_app PRIVATE electraone_api)
+```
+
+The target automatically propagates the required RtMidi dependency and the
+platform-specific MIDI libraries:
+
+- macOS — CoreMIDI, CoreAudio, and CoreFoundation
+- Linux — ALSA and pthreads
+- Windows — WinMM
+
+No additional link configuration is normally required.
+
+The `basic_usage` example uses the same approach. See
+[CMakeLists.txt](CMakeLists.txt) for the corresponding `add_executable()` and
+`target_link_libraries()` calls.
+
+### Linking without CMake
+
+When linking manually, include:
+
+1. `libelectraone.a` or `electraone.lib`
+2. the RtMidi static library
+3. the platform-specific MIDI libraries
+
+#### macOS
 
 ```bash
-# macOS
-c++ -std=c++17 -I include your_app.cpp build/libelectraone.a build/_deps/rtmidi-build/librtmidi.a \
-  -framework CoreMIDI -framework CoreAudio -framework CoreFoundation -o your_app
-
-# Linux
-c++ -std=c++17 -I include your_app.cpp build/libelectraone.a build/_deps/rtmidi-build/librtmidi.a \
-  -lasound -lpthread -o your_app
+c++ -std=c++17 \
+  -I include \
+  your_app.cpp \
+  build/libelectraone.a \
+  build/_deps/rtmidi-build/librtmidi.a \
+  -framework CoreMIDI \
+  -framework CoreAudio \
+  -framework CoreFoundation \
+  -o your_app
 ```
 
+#### Linux
+
+```bash
+c++ -std=c++17 \
+  -I include \
+  your_app.cpp \
+  build/libelectraone.a \
+  build/_deps/rtmidi-build/librtmidi.a \
+  -lasound \
+  -lpthread \
+  -o your_app
 ```
-:: Windows (Developer Command Prompt for VS; adjust the Release\ paths if
-:: you used a single-config generator like Ninja, where there's no config
-:: subfolder)
-cl /std:c++17 /I include your_app.cpp build\Release\electraone.lib build\_deps\rtmidi-build\Release\rtmidi.lib ^
-  winmm.lib /Fe:your_app.exe
+
+#### Windows
+
+Run the following command from a Visual Studio Developer Command Prompt:
+
+```bat
+cl /std:c++17 /I include ^
+  your_app.cpp ^
+  build\Release\electraone.lib ^
+  build\_deps\rtmidi-build\Release\rtmidi.lib ^
+  winmm.lib ^
+  /Fe:your_app.exe
 ```
 
-(If RtMidi came from `find_package` instead of being fetched - i.e. you pre-installed it system-wide - swap the `librtmidi.a`/`rtmidi.lib` path for a plain `-lrtmidi`/`rtmidi.lib`, and note it may be a shared library in that case, defeating the self-contained-binary property described above; that's outside this project's control since it means using whatever the system package provides.) `cmake --install build` installs the archive to `lib/` and both public headers to `include/electraone/` for system-wide use on any platform.
+The paths above assume a multi-configuration generator such as Visual Studio
+and a Release build. Single-configuration generators, such as Ninja, may place
+the libraries directly in the build directories without a `Release`
+subdirectory.
 
-The manual Windows command above is a best-effort translation of the macOS/Linux ones based on how MSVC and CMake's Visual Studio generator normally lay things out - it hasn't actually been run on a Windows machine. The CMake `target_link_libraries(your_app PRIVATE electraone_api)` approach just above is the one to trust; it doesn't depend on guessing paths like this.
+The manual Windows command is provided as a best-effort example and has not been
+verified on a Windows system. The CMake approach is recommended because it does
+not depend on generator-specific output paths.
 
-## Known documentation ambiguities
+### Using a system-installed RtMidi
 
-The upstream docs page has a couple of apparent copy/paste errors that this tool works around but can't fully resolve on its own:
+When RtMidi is provided by `find_package()` instead of being downloaded by the
+project, replace the explicit RtMidi archive path with the system library:
 
-- **Capture vs. snapshot byte collision**: Remove/Update/Swap Capture are documented with the *exact same* category/command bytes as Remove/Update/Swap Snapshot (`0x05 0x06`, `0x04 0x06`, `0x06 0x06`), and neither JSON payload has a field to disambiguate. This is almost certainly a docs error — the device can't tell them apart as documented. `capture update|remove|swap` send the documented bytes, but treat them as unverified. If you find the real values (firmware source, Electra support, or packet-sniffing the official editor), override them with `electraone raw --category ... --command ...` rather than filing this as a bug.
-- **Preset Bank Switch vs. USB Host Change**: both documented as `0x7E 0x08`, differing only by whether a bank byte is present. `events listen`/`logger listen` disambiguate by payload length (0 bytes = USB Host Change, 1 byte = Preset Bank Switch), which works but isn't a documented guarantee.
-- **Capture Data payload encoding**: documented only as "raw MIDI capture data," unlike every other payload (which is explicit ASCII/JSON). `capture get` decodes as text by default; pass `--raw` to dump the untouched response bytes if that turns out to be wrong.
+- macOS or Linux: `-lrtmidi`
+- Windows: `rtmidi.lib`
 
-## Troubleshooting a timeout
-
-If a command times out waiting for a reply (exit code 2) but `list-ports` shows the CTRL port:
-
-- Check the Electra One's **Settings → MIDI Control** is enabled — the CTRL port only processes SysEx commands when this is on.
-- Make sure no other app (e.g. the Electra One Editor / Preset Librarian) is already connected to the CTRL port — most MIDI backends don't allow two exclusive listeners.
-- Confirm the device is awake and not mid-update.
-- Try `electraone --timeout 8000 info` in case the device is just slow to respond.
+A system package may provide RtMidi as a shared library. In that case, the
+resulting application may no longer be a fully self-contained binary. The
+library type is determined by the installed RtMidi package and is outside this
+project's control.
