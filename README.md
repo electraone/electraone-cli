@@ -72,12 +72,12 @@ Visual Studio 2022 (the free Community edition works) with the
 SDK, and CMake integration. Also install and configure Git if the VS installer
 didn't already put it on `PATH`.
 
-Build from a "Developer Command Prompt for VS 2022" or via VS's built-in CMake
+Build from a "Developer Command Prompt for VS" or via VS's built-in CMake
 support:
 
 ```
-cmake -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Release
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
 ```
 
 ## Testing
