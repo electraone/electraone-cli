@@ -23,13 +23,12 @@
 #include "commands/common.hpp"
 #include "commands/event_decoder.hpp"
 
-// info, runtime-info, reboot, debug, midi-learn, usb-devices
-
 void registerInfoCommands(CLI::App &app, runner::Context &ctx)
 {
     app.add_subcommand(
            "info",
-           "Get Electra Info: firmware version, serial, hardware revision, model")
+           "Get Electra Info: firmware version, serial, hardware revision, "
+           "model")
         ->callback([&ctx] { runner::runQuery(ctx, 0x02, 0x7F, {}); });
 
     app.add_subcommand("runtime-info",
@@ -49,6 +48,31 @@ void registerInfoCommands(CLI::App &app, runner::Context &ctx)
     debug->add_subcommand("disable", "Disable debugging")->callback([&ctx] {
         runner::runAction(ctx, 0x7C, 0x00, {});
     });
+    {
+        static std::vector<int> breakpoints;
+        auto *sub = debug->add_subcommand(
+            "set-breakpoints",
+            "Set up to 8 Lua breakpoint line numbers (not in docs.electra.one "
+            "- found in the firmware source)");
+        sub->add_option("--breakpoints",
+                        breakpoints,
+                        "Line numbers, e.g. --breakpoints 10 42 100")
+            ->required();
+        sub->callback([&ctx] {
+            if (breakpoints.size() > 8) {
+                throw std::runtime_error(
+                    "set-breakpoints: at most 8 breakpoints are supported");
+            }
+            JsonDocument doc;
+            auto arr = doc.to<JsonArray>();
+            for (int bp : breakpoints)
+                arr.add(bp);
+            std::vector<uint8_t> params{ 91 };
+            auto jsonBytes = commands::jsonToBytes(doc);
+            params.insert(params.end(), jsonBytes.begin(), jsonBytes.end());
+            runner::runAction(ctx, 0x14, 0x40, params);
+        });
+    }
 
     auto *midiLearn =
         app.add_subcommand("midi-learn", "Control MIDI Learn mode");
@@ -61,7 +85,8 @@ void registerInfoCommands(CLI::App &app, runner::Context &ctx)
     static int duration = 0;
     auto *listen = midiLearn->add_subcommand(
         "listen",
-        "Listen for MIDI Learn Info events (parameter captures) until Ctrl+C or --duration elapses");
+        "Listen for MIDI Learn Info events (parameter captures) until Ctrl+C "
+        "or --duration elapses");
     listen
         ->add_option("--duration",
                      duration,
@@ -76,4 +101,15 @@ void registerInfoCommands(CLI::App &app, runner::Context &ctx)
     usb->add_subcommand("list",
                         "Get USB Host Devices: connected USB MIDI devices")
         ->callback([&ctx] { runner::runQuery(ctx, 0x02, 0x10, {}); });
+
+    auto *parameterMap = app.add_subcommand(
+        "parameter-map", "Application parameter map queries");
+    parameterMap->require_subcommand(1);
+    parameterMap
+        ->add_subcommand("list",
+                         "Get Parameter Map: application parameter map entries")
+        ->callback([&ctx] { runner::runQuery(ctx, 0x02, 0x41, {}); });
+
+    app.add_subcommand("screenshot", "Save Screenshot to the device")
+        ->callback([&ctx] { runner::runAction(ctx, 0x7F, 0x76, {}); });
 }

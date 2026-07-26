@@ -32,7 +32,8 @@ void registerPersistedCommands(CLI::App &app, runner::Context &ctx)
         static int bank = 0, slot = 0;
         auto *sub = persisted->add_subcommand(
             "get",
-            "Get Persisted Data: persisted Lua table as JSON (omit bank/slot for the current preset)");
+            "Get Persisted Data: persisted Lua table as JSON "
+            "(omit bank/slot for the current preset)");
         auto bankSlotOpts = commands::addBankSlot(sub, bank, slot);
         CLI::Option *bOpt = bankSlotOpts.first, *sOpt = bankSlotOpts.second;
         sub->callback([&ctx, bOpt, sOpt] {

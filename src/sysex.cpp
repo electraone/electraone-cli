@@ -122,8 +122,8 @@ namespace sysex
         size_t idx = 4;
         ParsedResponse resp;
 
-        // Optional leading transaction-id prefix: 0x00 lsb msb. No real category
-        // byte is ever 0x00, so this is unambiguous.
+        // Optional leading transaction-id prefix: 0x00 lsb msb. No real
+        // category byte is ever 0x00, so this is unambiguous.
         if (idx < raw.size() - 1 && raw[idx] == 0x00 && idx + 2 < raw.size()) {
             resp.transactionId = decode14bit(raw[idx + 1], raw[idx + 2]);
             idx += 3;
@@ -174,5 +174,4 @@ namespace sysex
         return resp.category == requestCategory
                && resp.command == requestCommand;
     }
-
 } // namespace sysex

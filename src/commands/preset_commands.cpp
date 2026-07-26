@@ -115,7 +115,7 @@ void registerPresetCommands(CLI::App &app, runner::Context &ctx)
             JsonDocument doc;
             doc["bankNumber"] = bank;
             doc["slot"] = slot;
-            doc["path"] = path;
+            doc["preset"] = path;
             runner::runAction(ctx, 0x04, 0x08, commands::jsonToBytes(doc));
         });
     }

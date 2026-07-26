@@ -21,11 +21,6 @@
 
 #pragma once
 
-// Forward declarations for each command group's subcommand-registration
-// function. Every register* function attaches its subcommands (and their
-// callbacks) onto `app`, using `ctx` as the shared connection/output
-// settings (see runner::Context).
-
 namespace CLI
 {
     class App;

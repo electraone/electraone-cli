@@ -59,7 +59,8 @@ void registerEventsCommands(CLI::App &app, runner::Context &ctx)
         static int duration = 0;
         auto *sub = events->add_subcommand(
             "listen",
-            "Subscribe then print decoded events until Ctrl+C or --duration elapses (default: all events)");
+            "Subscribe then print decoded events until Ctrl+C or --duration "
+            "elapses (default: all events)");
         commands::addSubscribeFlags(
             sub, page, controlSet, usbHost, pots, touch, button, window, all);
         sub->add_option("--duration",

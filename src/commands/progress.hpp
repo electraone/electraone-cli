@@ -26,14 +26,6 @@
 
 namespace commands
 {
-
-    // Renders a single fixed-width progress bar line, e.g.:
-    //   [=============>               ]  52% 4200/8054 bytes
-    // `sent` is clamped to `total` and total == 0 renders as complete (nothing
-    // to send). The numeric fields are padded to `total`'s own width, so the
-    // line's length never changes between updates - the caller can redraw it
-    // in place with a leading '\r' without leftover characters from a
-    // previous, longer line.
     std::string formatProgressBar(size_t sent, size_t total, int barWidth = 30);
 
-} // namespace commands
+}

@@ -21,10 +21,12 @@
 
 #pragma once
 
-// Minimal self-contained MD5 (RFC 1321). Used only to compute the checksum
-// the Electra file-transfer Commit Transaction JSON requires - not for any
-// security purpose, so a small hand-rolled implementation is fine here
-// rather than pulling in a crypto library.
+/*
+ * Minimal self-contained MD5 (RFC 1321). Used only to compute the checksum
+ * the Electra file-transfer Commit Transaction JSON requires - not for any
+ * security purpose, so a small hand-rolled implementation is fine here
+ * rather than pulling in a crypto library.
+ */
 
 #include <cstdint>
 #include <string>

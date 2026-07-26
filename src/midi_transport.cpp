@@ -44,7 +44,7 @@ namespace
         return s;
     }
 
-    // Finds the single port index whose name contains needle (case-insensitive).
+    // Finds single port index whose name contains needle (case-insensitive).
     // Throws std::runtime_error listing all candidates if the match count != 1.
     unsigned int findPortByName(const std::vector<std::string> &names,
                                 const std::string &needle,
@@ -67,12 +67,11 @@ namespace
         for (unsigned int i = 0; i < names.size(); ++i) {
             os << "  [" << i << "] " << names[i] << "\n";
         }
-        os << "Use --port with a more specific substring, or --port-index (or --out-port-index/--in-port-index "
-              "if "
-              "the output and input port lists don't line up) to pick one explicitly.";
+        os << "Use --port with a more specific substring, or --port-index "
+              "(or --out-port-index/--in-port-index if the output and input port "
+              "lists don't line up) to pick one explicitly.";
         throw std::runtime_error(os.str());
     }
-
 } // namespace
 
 MidiTransport::MidiTransport()
@@ -125,7 +124,8 @@ void MidiTransport::open(const std::string &nameSubstring,
         if (outIndex >= out_->getPortCount()) {
             throw std::runtime_error(
                 "--out-port-index " + std::to_string(outIndex)
-                + " is out of range (run 'electra list-ports' to see valid indices)");
+                + " is out of range (run 'electra list-ports' to see valid "
+                  "indices)");
         }
     } else {
         std::vector<std::string> outNames;
@@ -140,7 +140,8 @@ void MidiTransport::open(const std::string &nameSubstring,
         if (inIndex >= in_->getPortCount()) {
             throw std::runtime_error(
                 "--in-port-index " + std::to_string(inIndex)
-                + " is out of range (run 'electra list-ports' to see valid indices)");
+                + " is out of range (run 'electra list-ports' to see valid "
+                  "indices)");
         }
     } else {
         std::vector<std::string> inNames;

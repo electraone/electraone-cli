@@ -52,12 +52,14 @@ void registerLoggerCommands(CLI::App &app, runner::Context &ctx)
                     all = true;
         auto *sub = logger->add_subcommand(
             "listen",
-            "Enable logging, route it to this port, subscribe to controller events too, then print "
-            "both (timestamped) until Ctrl+C or --duration elapses (default: all event types)");
+            "Enable logging, route it to this port, subscribe to controller "
+            "events too, then print both (timestamped) until Ctrl+C or "
+            "--duration elapses (default: all event types)");
         sub->add_option(
                "--logger-port",
                loggerPort,
-               "Which device port to route log output to (default: ctrl, i.e. the port we're listening on)")
+               "Which device port to route log output to (default: ctrl, i.e. "
+               "the port we're listening on)")
             ->default_val("ctrl");
         sub->add_option("--duration",
                         duration,

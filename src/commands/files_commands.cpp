@@ -29,7 +29,8 @@
 #include "commands/terminal.hpp"
 #include "md5.hpp"
 
-// File Transfer SysEx API (firmware 4.0+): https://docs.electra.one/developers/filetransfer.html
+// File Transfer SysEx API (firmware 4.0+):
+//   https://docs.electra.one/developers/filetransfer.html
 //
 // Chunk encoding assumption: the docs describe Transfer Chunks' payload only
 // as "MIDI 7-bit encoded", without giving a bit-packing algorithm for
@@ -83,7 +84,8 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
 {
     auto *files = app.add_subcommand(
         "files",
-        "File Transfer API: upload/list/remove files stored on the device (firmware 4.0+)");
+        "File Transfer API: upload/list/remove files stored on the device "
+        "(firmware 4.0+)");
     files->require_subcommand(1);
 
     files
@@ -120,7 +122,8 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
         sub->add_flag(
             "--allow-binary",
             allowBinary,
-            "Skip the 7-bit ASCII check and send bytes as-is (see the note at the top of this file)");
+            "Skip the 7-bit ASCII check and send bytes as-is (see the note at "
+            "the top of this file)");
         sub->callback([&ctx] {
             auto content = runner::readFileOrStdin(data);
             std::vector<uint8_t> bytes(content.begin(), content.end());
@@ -143,8 +146,9 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
         sub->add_option(
                "--commit-timeout",
                commitTimeoutMs,
-               "Reply timeout for this commit in milliseconds, independent of --timeout (on-device MD5 "
-               "validation can take much longer than other commands for a large file)")
+               "Reply timeout for this commit in milliseconds, independent of "
+               "--timeout (on-device MD5 validation can take much longer than "
+               "other commands for a large file)")
             ->default_val(60000);
         sub->callback([&ctx] {
             auto content = runner::readFileOrStdin(jsonFile);
@@ -159,7 +163,8 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
         static int bank = 0, slot = 0;
         auto *sub = files->add_subcommand(
             "list",
-            "Get Location Files: list files (name + MD5) at a storage location");
+            "Get Location Files: list files (name + MD5) at a storage "
+            "location");
         sub->add_option("--location",
                         location,
                         "slots, updates, assets, modules, presets, or root")
@@ -192,7 +197,8 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
         static int bank = 0, slot = 0;
         auto *sub = files->add_subcommand(
             "remove",
-            "Remove Files from Location: delete every file at a storage location");
+            "Remove Files from Location: delete every file at a storage "
+            "location");
         sub->add_option("--location",
                         location,
                         "slots, updates, assets, modules, presets, or root")
@@ -229,7 +235,8 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
         static bool noProgress = false;
         auto *sub = files->add_subcommand(
             "upload",
-            "Upload a file end-to-end: open + register + send all chunks + commit, in one transaction");
+            "Upload a file end-to-end: open + register + send all chunks + "
+            "commit, in one transaction");
         sub->add_option("file", file, "File to upload (use - for stdin)")
             ->required();
         sub->add_option("--location",
@@ -239,8 +246,8 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
         sub->add_option(
                "--type",
                type,
-               "firmware, bootloader, preset, lua, luaModule, ui, config, deviceList, datafile, or "
-               "performance")
+               "firmware, bootloader, preset, lua, luaModule, ui, config, "
+               "deviceList, datafile, or performance")
             ->required();
         auto *bankOpt =
             sub->add_option("--bank", bank, "Bank number (location=slots)");
@@ -259,12 +266,14 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
         sub->add_flag(
             "--allow-binary",
             allowBinary,
-            "Skip the 7-bit ASCII check and send bytes as-is (see the note at the top of this file)");
+            "Skip the 7-bit ASCII check and send bytes as-is (see the note at "
+            "the top of this file)");
         sub->add_option(
                "--commit-timeout",
                commitTimeoutMs,
-               "Reply timeout for the final commit in milliseconds, independent of --timeout (on-device "
-               "MD5 validation can take much longer than opening/registering/sending chunks)")
+               "Reply timeout for the final commit in milliseconds, "
+               "independent of --timeout (on-device MD5 validation can take "
+               "much longer than opening/registering/sending chunks)")
             ->default_val(60000);
         sub->add_flag("--no-progress",
                       noProgress,
@@ -279,9 +288,10 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
                 for (unsigned char c : content) {
                     if (c >= 0x80) {
                         throw std::runtime_error(
-                            "file contains a byte >= 0x80; the chunk encoding for real binary data isn't "
-                            "verified (see the note at the top of files_commands.cpp) - pass --allow-binary "
-                            "to attempt it anyway");
+                            "file contains a byte >= 0x80; the chunk encoding "
+                            "for real binary data isn't verified (see the note "
+                            "at the top of files_commands.cpp) - pass "
+                            "--allow-binary to attempt it anyway");
                     }
                 }
             }

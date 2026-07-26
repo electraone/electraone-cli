@@ -32,39 +32,57 @@ void registerControlCommands(CLI::App &app, runner::Context &ctx)
     {
         static int id = 0;
         static std::string name, color;
-        static int value = 0;
+        static std::string valueId, valueText;
         static bool visible = false;
         auto *sub = control->add_subcommand(
-            "update", "Update Control: name/color/visibility/value (runtime)");
+            "update",
+            "Update Control: name/color/visibility/displayed value text "
+            "(runtime)");
         sub->add_option("--id", id, "Control ID")->required();
         auto *nameOpt = sub->add_option("--name", name, "New control name");
         auto *colorOpt = sub->add_option("--color", color, "New control color");
         auto *visibleOpt = sub->add_flag(
             "--visible,!--hidden", visible, "Show or hide the control");
-        auto *valueOpt = sub->add_option("--value", value, "New control value");
-        sub->callback([&ctx, nameOpt, colorOpt, visibleOpt, valueOpt] {
-            if (nameOpt->count() == 0 && colorOpt->count() == 0
-                && visibleOpt->count() == 0 && valueOpt->count() == 0) {
-                throw std::runtime_error(
-                    "update needs at least one of --name, --color, --visible/--hidden, --value");
-            }
-            auto idBytes = sysex::encode14bit(static_cast<uint16_t>(id));
-            std::vector<uint8_t> params{ idBytes[0], idBytes[1] };
+        auto *valueTextOpt = sub->add_option(
+            "--value-text",
+            valueText,
+            "Override the displayed text for one of the control's value "
+            "handles");
+        auto *valueIdOpt = sub->add_option(
+            "--value-id",
+            valueId,
+            "Which value handle --value-text applies to (defaults to the "
+            "control's main "
+            "\"value\" handle if omitted)");
+        sub->callback(
+            [&ctx, nameOpt, colorOpt, visibleOpt, valueTextOpt, valueIdOpt] {
+                if (nameOpt->count() == 0 && colorOpt->count() == 0
+                    && visibleOpt->count() == 0 && valueTextOpt->count() == 0) {
+                    throw std::runtime_error(
+                        "update needs at least one of --name, --color, "
+                        "--visible/--hidden, --value-text");
+                }
+                auto idBytes = sysex::encode14bit(static_cast<uint16_t>(id));
+                std::vector<uint8_t> params{ idBytes[0], idBytes[1] };
 
-            JsonDocument doc;
-            if (nameOpt->count() > 0)
-                doc["name"] = name;
-            if (colorOpt->count() > 0)
-                doc["color"] = color;
-            if (visibleOpt->count() > 0)
-                doc["visible"] = visible;
-            if (valueOpt->count() > 0)
-                doc["value"] = value;
-            auto jsonBytes = commands::jsonToBytes(doc);
-            params.insert(params.end(), jsonBytes.begin(), jsonBytes.end());
+                JsonDocument doc;
+                if (nameOpt->count() > 0)
+                    doc["name"] = name;
+                if (colorOpt->count() > 0)
+                    doc["color"] = color;
+                if (visibleOpt->count() > 0)
+                    doc["visible"] = visible;
+                if (valueTextOpt->count() > 0) {
+                    auto valueObj = doc["value"].to<JsonObject>();
+                    if (valueIdOpt->count() > 0)
+                        valueObj["id"] = valueId;
+                    valueObj["text"] = valueText;
+                }
+                auto jsonBytes = commands::jsonToBytes(doc);
+                params.insert(params.end(), jsonBytes.begin(), jsonBytes.end());
 
-            runner::runAction(ctx, 0x14, 0x07, params);
-        });
+                runner::runAction(ctx, 0x14, 0x07, params);
+            });
     }
     {
         static int id = 0;

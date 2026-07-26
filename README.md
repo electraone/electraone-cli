@@ -173,31 +173,33 @@ IDs.
 ## Command groups
 
 Run `electraone <group> --help` or `electraone <group> <subcommand> --help` for
-full details about command and their sub-commands.
+full details about groups and their sub-commands.
 
-| Group          | Subcommands                                                                                                           |
-| -------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `list-ports`   |                                                                                                                       |
-| `info`         |                                                                                                                       |
-| `runtime-info` |                                                                                                                       |
-| `reboot`       |                                                                                                                       |
-| `debug`        | `enable`, `disable`                                                                                                   |
-| `midi-learn`   | `enable`, `disable`, `listen`                                                                                         |
-| `usb-devices`  | `list`                                                                                                                |
-| `preset`       | `get`, `upload <file>`, `remove`, `clear-slot`, `list`, `slot-info`, `switch`, `set-slot`, `reload`, `load-preloaded` |
-| `lua`          | `get`, `upload <file>`, `remove`, `exec <code>\|--file`                                                               |
-| `overrides`    | `get`, `upload <file>`                                                                                                |
-| `persisted`    | `get`, `upload <file>`                                                                                                |
-| `performance`  | `get`, `upload <file>`                                                                                                |
-| `config`       | `get`, `upload <file>`, `remove`                                                                                      |
-| `snapshot`     | `list`, `get`, `update`, `remove`, `swap`, `set-slot`                                                                 |
-| `capture`      | `list`, `get`, `update`, `remove`, `swap`, `set-slot`                                                                 |
-| `control`      | `update`, `override-text`                                                                                             |
-| `ui`           | `page-switch`, `control-set-switch`, `bottom-bar-text`                                                                |
-| `events`       | `set-port`, `subscribe`, `listen`                                                                                     |
-| `logger`       | `enable`, `disable`, `set-port`, `listen`                                                                             |
-| `window`       | `stop`, `resume`                                                                                                      |
-| `files`        | `open`, `register`, `send-chunk`, `commit`, `list`, `remove`, `upload <file>` (composite) — see below                 |
+| Group           | Subcommands                                                                                                           |
+| --------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `list-ports`    |                                                                                                                       |
+| `info`          |                                                                                                                       |
+| `runtime-info`  |                                                                                                                       |
+| `reboot`        |                                                                                                                       |
+| `preset`        | `get`, `upload <file>`, `remove`, `clear-slot`, `list`, `slot-info`, `switch`, `set-slot`, `reload`, `load-preloaded` |
+| `lua`           | `get`, `upload <file>`, `remove`, `exec <code>\|--file`                                                               |
+| `overrides`     | `get`, `upload <file>`                                                                                                |
+| `persisted`     | `get`, `upload <file>`                                                                                                |
+| `performance`   | `get`, `upload <file>`                                                                                                |
+| `config`        | `get`, `upload <file>`, `remove`                                                                                      |
+| `snapshot`      | `list`, `get`, `update`, `remove`, `swap`, `set-slot`                                                                 |
+| `capture`       | `list`, `get`, `update`, `remove`, `swap`, `set-slot`                                                                 |
+| `control`       | `update`, `override-text`                                                                                             |
+| `parameter-map` | `list`                                                                                                                |
+| `midi-learn`    | `enable`, `disable`, `listen`                                                                                         |
+| `usb-devices`   | `list`                                                                                                                |
+| `ui`            | `page-switch`, `control-set-switch`, `bottom-bar-text`                                                                |
+| `events`        | `set-port`, `subscribe`, `listen`                                                                                     |
+| `logger`        | `enable`, `disable`, `set-port`, `listen`                                                                             |
+| `window`        | `stop`, `resume`                                                                                                      |
+| `debug`         | `enable`, `disable`, `set-breakpoints`                                                                                |
+| `files`         | `open`, `register`, `send-chunk`, `commit`, `list`, `remove`, `upload <file>` (composite) — see below                 |
+| `screenshot`    |                                                                                                                       |
 
 ### Examples
 
@@ -209,7 +211,7 @@ electraone preset get --bank 0 --slot 1
 electraone preset upload my-preset.json
 electraone snapshot list --project-id nljaziUjglOuD1fe15Eq
 electraone lua exec "print('hello')"
-electraone control update --id 42 --value 100
+electraone control update --id 42 --value-text "hello"
 electraone events listen --pots --touch --duration 30
 ```
 

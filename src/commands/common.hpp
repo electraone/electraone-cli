@@ -21,10 +21,6 @@
 
 #pragma once
 
-// Small shared helpers used across command group implementations: CLI11 and
-// ArduinoJson are both header-only, so it's cheap for every commands/*.cpp
-// file to pull this in directly.
-
 #include <ArduinoJson.h>
 
 #include <CLI/CLI.hpp>
@@ -173,20 +169,20 @@ namespace commands
         app.add_option(
             "--port-index",
             ctx.portIndex,
-            "Use this MIDI port index directly for both output and input instead of "
-            "matching by name (see 'electra list-ports')");
+            "Use this MIDI port index directly for both output and input "
+            "instead of matching by name (see 'electra list-ports')");
         app.add_option(
             "--out-port-index",
             ctx.outPortIndex,
-            "Use this index for the output port directly, overriding --port-index. Needed "
-            "when the output and input port lists are different lengths (e.g. on Windows, "
-            "where a software-only synth can show up as an extra output port), so the "
-            "correct output and input indices for the same device no longer match.");
-        app.add_option(
-            "--in-port-index",
-            ctx.inPortIndex,
-            "Use this index for the input port directly, overriding --port-index. See "
-            "--out-port-index.");
+            "Use this index for the output port directly, overriding "
+            "--port-index. Needed when the output and input port lists are "
+            "different lengths (e.g. on Windows, where a software-only synth "
+            "can show up as an extra output port), so the correct output and "
+            "input indices for the same device no longer match.");
+        app.add_option("--in-port-index",
+                       ctx.inPortIndex,
+                       "Use this index for the input port directly, overriding "
+                       "--port-index. See --out-port-index.");
         app.add_option(
                "--timeout", ctx.timeoutMs, "Reply timeout in milliseconds")
             ->default_val(3000);
@@ -204,14 +200,12 @@ namespace commands
         app.add_flag(
             "--pretty",
             ctx.pretty,
-            "Pretty-print JSON responses with indentation for human reading (non-JSON payloads, e.g. Lua "
-            "source, are printed unchanged)");
+            "Pretty-print JSON responses with indentation for human reading "
+            "(non-JSON payloads, e.g. Lua source, are printed unchanged)");
         app.add_flag(
             "--human",
             ctx.human,
-            "Render JSON responses for human reading: objects as an indented tree preserving the JSON "
-            "structure, arrays as an `ls`-style listing (table for arrays of objects, a column grid for "
-            "arrays of scalars). Takes precedence over --pretty; -h is unavailable, it's already --help.");
+            "Render JSON responses for human reading: objects as an indented "
+            "tree preserving the JSON structure");
     }
-
 } // namespace commands

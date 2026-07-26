@@ -69,14 +69,16 @@ namespace electraone
         // the output and input port lists are different lengths - e.g. on
         // Windows, a software-only synth can show up as an extra output port
         // with no matching input, shifting every real device's output index out
-        // of alignment with its input index - so a single shared portIndex can't
-        // address both directions correctly.
+        // of alignment with its input index - so a single shared portIndex
+        // can't address both directions correctly.
         std::optional<unsigned int> outPortIndex;
         std::optional<unsigned int> inPortIndex;
-        // Default reply timeout for every command method below, in milliseconds.
+        // Default reply timeout for every command method below, in
+        // milliseconds.
         int timeoutMs = 3000;
         // Optional 14-bit transaction ID attached to every outgoing request
-        // (firmware 4.0+); ACK/NACK replies echo it back in Response::transactionId.
+        // (firmware 4.0+); ACK/NACK replies echo it back in
+        // Response::transactionId.
         std::optional<uint16_t> transactionId;
     };
 
@@ -101,7 +103,13 @@ namespace electraone
         std::optional<std::string> name;
         std::optional<std::string> color;
         std::optional<bool> visible;
-        std::optional<int> value;
+        // Overrides the displayed text for one of the control's value
+        // handles - the firmware's SysexApi::updateControl reads this as
+        // {"value": {"id": ..., "text": ...}}, not a raw number. Only
+        // valueText is required; valueId defaults to the control's main
+        // "value" handle (matching the firmware's own default) if left unset.
+        std::optional<std::string> valueId;
+        std::optional<std::string> valueText;
     };
 
     // Destination + options for Client::uploadFile. location/type follow the
@@ -109,7 +117,8 @@ namespace electraone
     // "assets", "modules", "presets", "root"; type is one of "firmware",
     // "bootloader", "preset", "lua", "luaModule", "ui", "config", "deviceList",
     // "datafile", "performance". Set bank/slot for "slots" destinations, or
-    // ns/path for "modules"/"presets" destinations, per the destination's needs.
+    // ns/path for "modules"/"presets" destinations, per the destination's
+    // needs.
     struct UploadFileOptions {
         std::string location;
         std::string type;
@@ -118,28 +127,30 @@ namespace electraone
         std::optional<std::string> ns;
         std::optional<std::string> path;
         int id = 1; // only needs to be unique within this transaction
-        int chunkSize = 256; // bytes of file data per Transfer Chunks message
-        // The device's Transfer Chunks payload encoding for arbitrary 8-bit bytes
-        // isn't documented (see README.md); by default every byte is checked to
-        // be < 0x80 and rejected otherwise. Set true to bypass that check for
-        // genuinely binary content (firmware/bootloader) - it's still sent
-        // unpacked, so it will most likely fail an MD5 mismatch at commit rather
-        // than corrupt anything (commit is atomic), but there's no verified
-        // packing scheme to fall back to.
+        int chunkSize = 4096; // bytes of file data per Transfer Chunks message
+        // The device's Transfer Chunks payload encoding for arbitrary 8-bit
+        // bytes isn't documented (see README.md); by default every byte is
+        // checked to be < 0x80 and rejected otherwise. Set true to bypass that
+        // check for genuinely binary content (firmware/bootloader) - it's still
+        // sent unpacked, so it will most likely fail an MD5 mismatch at commit
+        // rather than corrupt anything (commit is atomic)
         bool allowBinary = false;
         // Commit validates every file's MD5 on-device before applying anything,
         // which can take much longer than any other command for a large file -
-        // give it its own generous timeout rather than ConnectOptions::timeoutMs
+        // give it its own generous timeout rather than
+        // onnectOptions::timeoutMs
         // (meant for quick request/reply commands). Bump this further for very
         // large files if a commit still times out.
         int commitTimeoutMs = 60000;
-        // Called after each chunk is acknowledged, with (bytesSentSoFar, totalBytes).
+        // Called after each chunk is acknowledged, with (bytesSentSoFar,
+        // totalBytes).
         std::function<void(size_t, size_t)> onProgress;
     };
 
     // One-line human-readable rendering of a Response, e.g. "Pot Touch: pot=3
     // control=1042 touched=1" or "ACK" or "NACK". Useful for logging whatever
-    // comes back from Client::poll(). Mirrors the electraone CLI's `events listen`.
+    // comes back from Client::poll(). Mirrors the electraone CLI's `events
+    // listen`.
     std::string describeEvent(const Response &response);
 
     class Client
@@ -155,15 +166,17 @@ namespace electraone
         static std::vector<std::string> listOutputPorts();
         static std::vector<std::string> listInputPorts();
 
-        // Opens the matching MIDI port pair. Throws std::runtime_error (with the
-        // candidate port list in what()) if the match isn't exactly one port.
+        // Opens the matching MIDI port pair. Throws std::runtime_error (with
+        // the candidate port list in what()) if the match isn't exactly one
+        // port.
         void connect(const ConnectOptions &options = {});
         bool isConnected() const;
 
         // ---- Low-level ----
 
         // Sends an arbitrary category/command/payload and waits for a reply.
-        // timeoutMs < 0 uses the ConnectOptions timeout. std::nullopt on timeout.
+        // timeoutMs < 0 uses the ConnectOptions timeout. std::nullopt on
+        // timeout.
         std::optional<Response> send(uint8_t category,
                                      uint8_t command,
                                      const std::vector<uint8_t> &params = {},
@@ -184,6 +197,18 @@ namespace electraone
         std::optional<Response> setDebug(bool enabled);
         std::optional<Response> setMidiLearn(bool enabled);
         std::optional<Response> getUsbHostDevices();
+        // Not in docs.electra.one - found in the firmware source
+        // (ElectraCommand::Object::ParameterMap / SysexApi::sendParameterMap).
+        std::optional<Response> getParameterMap();
+        // Not in docs.electra.one - found in the firmware source
+        // (ElectraCommand::Object::Screenshot / SysexApi::saveScreenshot).
+        std::optional<Response> saveScreenshot();
+        // Not in docs.electra.one - found in the firmware source
+        // (SysexApi::processDebug, category 0x14/Object::Trace, sub-command
+        // byte 91). Sets up to 8 Lua breakpoint line numbers; throws
+        // std::runtime_error if given more than 8.
+        std::optional<Response>
+            setBreakpoints(const std::vector<uint16_t> &breakpoints);
 
         // ---- Preset ----
         // getPreset/getLuaScript/getDeviceOverrides/getPersistedData: pass no
@@ -251,11 +276,10 @@ namespace electraone
                                                 int slot); // runtime, volatile
 
         // ---- Capture ----
-        // NOTE: the Electra docs give Update/Remove/Swap Capture the exact same
-        // category/command bytes as the Snapshot equivalents, with nothing in
-        // the JSON to disambiguate - almost certainly a docs error. These three
-        // send the documented (probably wrong) bytes; see README.md. Use
-        // Client::send() to override once you've confirmed the real values.
+        // docs.electra.one gives Update/Remove/Swap Capture the same
+        // category/command bytes as the Snapshot equivalents (a documentation
+        // error) - these three use command byte 0x32 (CaptureInfo), confirmed
+        // against the firmware's SysexApi.cpp dispatch. See README.md.
         std::optional<Response> getCapturesList(const std::string &projectId);
         std::optional<Response>
             getCaptureData(const std::string &projectId, int bank, int slot);
@@ -332,5 +356,4 @@ namespace electraone
         struct Impl;
         std::unique_ptr<Impl> impl_;
     };
-
 } // namespace electraone

@@ -46,7 +46,8 @@ public:
     // Prints all available MIDI output and input ports with their indices.
     static void listPorts();
 
-    // Same enumeration as listPorts(), returned as name lists instead of printed.
+    // Same enumeration as listPorts(), returned as name lists instead of
+    // printed.
     static std::vector<std::string> listOutputPortNames();
     static std::vector<std::string> listInputPortNames();
 

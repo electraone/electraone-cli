@@ -103,9 +103,6 @@ namespace commands
                     os << "Control Set Switch: set=" << byteAt(0);
                     return os.str();
                 case 0x08:
-                    // Docs give Preset Bank Switch (1-byte payload) and USB Host
-                    // Change (0-byte payload) the same category/command bytes;
-                    // disambiguate by payload length since that's all we have.
                     if (r.payload.empty()) {
                         os << "USB Host Change";
                     } else {
