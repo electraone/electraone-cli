@@ -96,6 +96,27 @@ ctest --test-dir build --output-on-failure
 or run `./build/electraone_tests` directly for doctest's own output (`--help`
 for its filtering/reporting options).
 
+## Formatting
+
+Source style is enforced with `clang-format` (see `.clang-format`). Two
+targets are provided via the top-level `Makefile`:
+
+```bash
+make format        # reformat every source file in place
+make format-check  # fail (nonzero exit) if any file isn't already formatted
+```
+
+CI runs `make format-check` on every push and pull request (see
+`.github/workflows/ci.yml`, job `format-check`) - reformat with `make format`
+and commit the result if it fails. Configure this as a required status check
+under the repo's branch protection settings to block merging until it passes.
+
+Both targets need `make`, `find`, and `clang-format` on `PATH`. This works out
+of the box on Linux and macOS. On native Windows (a Developer Command Prompt),
+none of those three are available by default - use Git Bash, WSL, or
+MSYS2/MinGW instead, or just rely on the CI check catching formatting issues
+after pushing.
+
 ## Connecting
 
 Once the command line tool is built, you can use it to interact wih the
