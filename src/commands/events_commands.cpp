@@ -22,6 +22,7 @@
 #include "commands/command.hpp"
 #include "commands/common.hpp"
 #include "commands/event_decoder.hpp"
+#include "electra_command.hpp"
 
 void registerEventsCommands(CLI::App &app, runner::Context &ctx)
 {
@@ -33,8 +34,10 @@ void registerEventsCommands(CLI::App &app, runner::Context &ctx)
         auto *sub = events->add_subcommand("set-port", "Set Events MIDI Port");
         sub->add_option("--port", port, "port1, port2, or ctrl")->required();
         sub->callback([&ctx] {
-            runner::runAction(
-                ctx, 0x14, 0x7B, { commands::parsePortSelector(port) });
+            runner::runAction(ctx,
+                              ElectraCommand::Type::UpdateRuntime,
+                              ElectraCommand::Object::ControlPort,
+                              { commands::parsePortSelector(port) });
         });
     }
     {
@@ -49,7 +52,10 @@ void registerEventsCommands(CLI::App &app, runner::Context &ctx)
         sub->callback([&ctx] {
             uint8_t flags = commands::subscribeFlagsToByte(
                 page, controlSet, usbHost, pots, touch, button, window, all);
-            runner::runAction(ctx, 0x14, 0x79, { flags });
+            runner::runAction(ctx,
+                              ElectraCommand::Type::UpdateRuntime,
+                              ElectraCommand::Object::EventSubscription,
+                              { flags });
         });
     }
     {
@@ -70,7 +76,11 @@ void registerEventsCommands(CLI::App &app, runner::Context &ctx)
         sub->callback([&ctx] {
             uint8_t flags = commands::subscribeFlagsToByte(
                 page, controlSet, usbHost, pots, touch, button, window, all);
-            auto msg = sysex::buildMessage(0x14, 0x79, { flags }, ctx.txnId);
+            auto msg =
+                sysex::buildMessage(ElectraCommand::Type::UpdateRuntime,
+                                    ElectraCommand::Object::EventSubscription,
+                                    { flags },
+                                    ctx.txnId);
             runner::listen(
                 ctx, { msg }, duration, commands::printEventWithTimestamp);
         });

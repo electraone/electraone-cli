@@ -22,6 +22,7 @@
 #include "commands/command.hpp"
 #include "commands/common.hpp"
 #include "commands/event_decoder.hpp"
+#include "electra_command.hpp"
 
 void registerLoggerCommands(CLI::App &app, runner::Context &ctx)
 {
@@ -29,19 +30,29 @@ void registerLoggerCommands(CLI::App &app, runner::Context &ctx)
     logger->require_subcommand(1);
 
     logger->add_subcommand("enable", "Control Logger Output: enable")
-        ->callback(
-            [&ctx] { runner::runAction(ctx, 0x7F, 0x7D, { 0x01, 0x00 }); });
+        ->callback([&ctx] {
+            runner::runAction(ctx,
+                              ElectraCommand::Type::SystemCall,
+                              ElectraCommand::Object::Logger,
+                              { 0x01, 0x00 });
+        });
     logger->add_subcommand("disable", "Control Logger Output: disable")
-        ->callback(
-            [&ctx] { runner::runAction(ctx, 0x7F, 0x7D, { 0x00, 0x00 }); });
+        ->callback([&ctx] {
+            runner::runAction(ctx,
+                              ElectraCommand::Type::SystemCall,
+                              ElectraCommand::Object::Logger,
+                              { 0x00, 0x00 });
+        });
 
     {
         static std::string port;
         auto *sub = logger->add_subcommand("set-port", "Set Logger MIDI Port");
         sub->add_option("--port", port, "port1, port2, or ctrl")->required();
         sub->callback([&ctx] {
-            runner::runAction(
-                ctx, 0x14, 0x7D, { commands::parsePortSelector(port), 0x00 });
+            runner::runAction(ctx,
+                              ElectraCommand::Type::UpdateRuntime,
+                              ElectraCommand::Object::Logger,
+                              { commands::parsePortSelector(port), 0x00 });
         });
     }
     {
@@ -69,16 +80,22 @@ void registerLoggerCommands(CLI::App &app, runner::Context &ctx)
             sub, page, controlSet, usbHost, pots, touch, button, window, all);
         sub->callback([&ctx] {
             auto enableMsg =
-                sysex::buildMessage(0x7F, 0x7D, { 0x01, 0x00 }, ctx.txnId);
+                sysex::buildMessage(ElectraCommand::Type::SystemCall,
+                                    ElectraCommand::Object::Logger,
+                                    { 0x01, 0x00 },
+                                    ctx.txnId);
             auto setPortMsg = sysex::buildMessage(
-                0x14,
-                0x7D,
+                ElectraCommand::Type::UpdateRuntime,
+                ElectraCommand::Object::Logger,
                 { commands::parsePortSelector(loggerPort), 0x00 },
                 ctx.txnId);
             uint8_t flags = commands::subscribeFlagsToByte(
                 page, controlSet, usbHost, pots, touch, button, window, all);
             auto subscribeMsg =
-                sysex::buildMessage(0x14, 0x79, { flags }, ctx.txnId);
+                sysex::buildMessage(ElectraCommand::Type::UpdateRuntime,
+                                    ElectraCommand::Object::EventSubscription,
+                                    { flags },
+                                    ctx.txnId);
             runner::listen(ctx,
                            { enableMsg, setPortMsg, subscribeMsg },
                            duration,

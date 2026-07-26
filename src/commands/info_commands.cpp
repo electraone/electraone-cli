@@ -22,6 +22,7 @@
 #include "commands/command.hpp"
 #include "commands/common.hpp"
 #include "commands/event_decoder.hpp"
+#include "electra_command.hpp"
 
 void registerInfoCommands(CLI::App &app, runner::Context &ctx)
 {
@@ -29,24 +30,41 @@ void registerInfoCommands(CLI::App &app, runner::Context &ctx)
            "info",
            "Get Electra Info: firmware version, serial, hardware revision, "
            "model")
-        ->callback([&ctx] { runner::runQuery(ctx, 0x02, 0x7F, {}); });
+        ->callback([&ctx] {
+            runner::runQuery(ctx,
+                             ElectraCommand::Type::FileRequest,
+                             ElectraCommand::Object::ElectraInfo,
+                             {});
+        });
 
     app.add_subcommand("runtime-info",
                        "Get Runtime Info: free memory percentage, uptime")
-        ->callback([&ctx] { runner::runQuery(ctx, 0x02, 0x7E, {}); });
+        ->callback([&ctx] {
+            runner::runQuery(ctx,
+                             ElectraCommand::Type::FileRequest,
+                             ElectraCommand::Object::RuntimeInfo,
+                             {});
+        });
 
     app.add_subcommand("reboot", "Reboot the device")->callback([&ctx] {
-        runner::runAction(ctx, 0x7F, 0x78, {});
+        runner::runAction(ctx,
+                          ElectraCommand::Type::SystemCall,
+                          ElectraCommand::Object::Reboot,
+                          {});
     });
 
     auto *debug =
         app.add_subcommand("debug", "Enable/disable device debugging");
     debug->require_subcommand(1);
+    // Category 0x7C doesn't correspond to any ElectraCommand::Type value; it
+    // numerically matches Object::AppInfo instead (see the same note on
+    // Client::setDebug in ElectraOneClient.cpp). 0x01/0x00 are plain booleans,
+    // not ElectraCommand::Object::Enable/Disable (those are 0x01/0x02).
     debug->add_subcommand("enable", "Enable debugging")->callback([&ctx] {
-        runner::runAction(ctx, 0x7C, 0x01, {});
+        runner::runAction(ctx, ElectraCommand::Object::AppInfo, 0x01, {});
     });
     debug->add_subcommand("disable", "Disable debugging")->callback([&ctx] {
-        runner::runAction(ctx, 0x7C, 0x00, {});
+        runner::runAction(ctx, ElectraCommand::Object::AppInfo, 0x00, {});
     });
     {
         static std::vector<int> breakpoints;
@@ -67,10 +85,15 @@ void registerInfoCommands(CLI::App &app, runner::Context &ctx)
             auto arr = doc.to<JsonArray>();
             for (int bp : breakpoints)
                 arr.add(bp);
-            std::vector<uint8_t> params{ 91 };
+            std::vector<uint8_t> params{
+                ElectraCommand::Trace::SetBreakpoints
+            };
             auto jsonBytes = commands::jsonToBytes(doc);
             params.insert(params.end(), jsonBytes.begin(), jsonBytes.end());
-            runner::runAction(ctx, 0x14, 0x40, params);
+            runner::runAction(ctx,
+                              ElectraCommand::Type::UpdateRuntime,
+                              ElectraCommand::Object::Trace,
+                              params);
         });
     }
 
@@ -78,10 +101,18 @@ void registerInfoCommands(CLI::App &app, runner::Context &ctx)
         app.add_subcommand("midi-learn", "Control MIDI Learn mode");
     midiLearn->require_subcommand(1);
     midiLearn->add_subcommand("enable", "Enable MIDI Learn")->callback([&ctx] {
-        runner::runAction(ctx, 0x03, 0x01, {});
+        runner::runAction(ctx,
+                          ElectraCommand::Type::MidiLearnSwitch,
+                          ElectraCommand::Object::MidiLearnOn,
+                          {});
     });
     midiLearn->add_subcommand("disable", "Disable MIDI Learn")
-        ->callback([&ctx] { runner::runAction(ctx, 0x03, 0x00, {}); });
+        ->callback([&ctx] {
+            runner::runAction(ctx,
+                              ElectraCommand::Type::MidiLearnSwitch,
+                              ElectraCommand::Object::MidiLearnOff,
+                              {});
+        });
     static int duration = 0;
     auto *listen = midiLearn->add_subcommand(
         "listen",
@@ -100,7 +131,12 @@ void registerInfoCommands(CLI::App &app, runner::Context &ctx)
     usb->require_subcommand(1);
     usb->add_subcommand("list",
                         "Get USB Host Devices: connected USB MIDI devices")
-        ->callback([&ctx] { runner::runQuery(ctx, 0x02, 0x10, {}); });
+        ->callback([&ctx] {
+            runner::runQuery(ctx,
+                             ElectraCommand::Type::FileRequest,
+                             ElectraCommand::Object::UsbHostList,
+                             {});
+        });
 
     auto *parameterMap = app.add_subcommand(
         "parameter-map", "Application parameter map queries");
@@ -108,8 +144,18 @@ void registerInfoCommands(CLI::App &app, runner::Context &ctx)
     parameterMap
         ->add_subcommand("list",
                          "Get Parameter Map: application parameter map entries")
-        ->callback([&ctx] { runner::runQuery(ctx, 0x02, 0x41, {}); });
+        ->callback([&ctx] {
+            runner::runQuery(ctx,
+                             ElectraCommand::Type::FileRequest,
+                             ElectraCommand::Object::ParameterMap,
+                             {});
+        });
 
     app.add_subcommand("screenshot", "Save Screenshot to the device")
-        ->callback([&ctx] { runner::runAction(ctx, 0x7F, 0x76, {}); });
+        ->callback([&ctx] {
+            runner::runAction(ctx,
+                              ElectraCommand::Type::SystemCall,
+                              ElectraCommand::Object::Screenshot,
+                              {});
+        });
 }

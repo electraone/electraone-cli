@@ -23,6 +23,7 @@
 
 #include "commands/command.hpp"
 #include "commands/common.hpp"
+#include "electra_command.hpp"
 
 void registerLuaCommands(CLI::App &app, runner::Context &ctx)
 {
@@ -39,8 +40,8 @@ void registerLuaCommands(CLI::App &app, runner::Context &ctx)
         sub->callback([&ctx, bOpt, sOpt] {
             runner::runQuery(
                 ctx,
-                0x02,
-                0x0C,
+                ElectraCommand::Type::FileRequest,
+                ElectraCommand::Object::FileLua,
                 commands::optionalBankSlotParams(bOpt, sOpt, bank, slot));
         });
     }
@@ -51,7 +52,10 @@ void registerLuaCommands(CLI::App &app, runner::Context &ctx)
         sub->add_option("file", file, "Lua source file")->required();
         sub->callback([&ctx] {
             auto content = runner::readFileOrStdin(file);
-            runner::runAction(ctx, 0x01, 0x0C, sysex::encodeAscii(content));
+            runner::runAction(ctx,
+                              ElectraCommand::Type::FileUpload,
+                              ElectraCommand::Object::FileLua,
+                              sysex::encodeAscii(content));
         });
     }
     {
@@ -59,8 +63,10 @@ void registerLuaCommands(CLI::App &app, runner::Context &ctx)
         auto *sub = lua->add_subcommand("remove", "Remove Lua Script");
         commands::addBankSlot(sub, bank, slot, true);
         sub->callback([&ctx] {
-            runner::runAction(
-                ctx, 0x05, 0x0C, commands::bankSlotParams(bank, slot));
+            runner::runAction(ctx,
+                              ElectraCommand::Type::Remove,
+                              ElectraCommand::Object::FileLua,
+                              commands::bankSlotParams(bank, slot));
         });
     }
     {
@@ -80,7 +86,10 @@ void registerLuaCommands(CLI::App &app, runner::Context &ctx)
                 throw std::runtime_error(
                     "provide Lua code as an argument or via --file");
             }
-            runner::runAction(ctx, 0x08, 0x0D, sysex::encodeAscii(source));
+            runner::runAction(ctx,
+                              ElectraCommand::Type::Execute,
+                              ElectraCommand::Object::Function,
+                              sysex::encodeAscii(source));
         });
     }
 }

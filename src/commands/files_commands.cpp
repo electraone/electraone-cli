@@ -27,6 +27,7 @@
 #include "commands/event_decoder.hpp"
 #include "commands/progress.hpp"
 #include "commands/terminal.hpp"
+#include "electra_command.hpp"
 #include "md5.hpp"
 
 // File Transfer SysEx API (firmware 4.0+):
@@ -91,7 +92,12 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
     files
         ->add_subcommand(
             "open", "Open Cache Transaction: start a new file transfer session")
-        ->callback([&ctx] { runner::runAction(ctx, 0x01, 0x2D, {}); });
+        ->callback([&ctx] {
+            runner::runAction(ctx,
+                              ElectraCommand::Type::FileUpload,
+                              ElectraCommand::Object::FileStagedCache,
+                              {});
+        });
 
     {
         static int id = 0;
@@ -104,7 +110,10 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
             auto sizeBytes = sysex::encode28bit(static_cast<uint32_t>(size));
             std::vector<uint8_t> params{ static_cast<uint8_t>(id) };
             params.insert(params.end(), sizeBytes.begin(), sizeBytes.end());
-            runner::runAction(ctx, 0x01, 0x2E, params);
+            runner::runAction(ctx,
+                              ElectraCommand::Type::FileUpload,
+                              ElectraCommand::Object::FileStagedHeader,
+                              params);
         });
     }
     {
@@ -132,7 +141,11 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
             std::vector<uint8_t> params{ static_cast<uint8_t>(id) };
             params.insert(params.end(), bytes.begin(), bytes.end());
             runner::runActionAwaitingAck(
-                ctx, 0x01, 0x2F, params, printProgress);
+                ctx,
+                ElectraCommand::Type::FileUpload,
+                ElectraCommand::Object::FileStagedChunk,
+                params,
+                printProgress);
         });
     }
     {
@@ -154,8 +167,10 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
             auto content = runner::readFileOrStdin(jsonFile);
             runner::Context commitCtx = ctx;
             commitCtx.timeoutMs = commitTimeoutMs;
-            runner::runAction(
-                commitCtx, 0x04, 0x2D, sysex::encodeAscii(content));
+            runner::runAction(commitCtx,
+                              ElectraCommand::Type::Update,
+                              ElectraCommand::Object::FileStagedCache,
+                              sysex::encodeAscii(content));
         });
     }
     {
@@ -179,8 +194,8 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
             sub->add_option("--path", path, "Path (location=modules/presets)");
         sub->callback([&ctx, bankOpt, slotOpt, nsOpt, pathOpt] {
             runner::runQuery(ctx,
-                             0x02,
-                             0x34,
+                             ElectraCommand::Type::FileRequest,
+                             ElectraCommand::Object::Location,
                              locationJson(location,
                                           bankOpt,
                                           bank,
@@ -213,8 +228,8 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
             sub->add_option("--path", path, "Path (location=modules/presets)");
         sub->callback([&ctx, bankOpt, slotOpt, nsOpt, pathOpt] {
             runner::runAction(ctx,
-                              0x05,
-                              0x34,
+                              ElectraCommand::Type::Remove,
+                              ElectraCommand::Object::Location,
                               locationJson(location,
                                            bankOpt,
                                            bank,
@@ -301,7 +316,10 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
                       << " bytes)\n";
 
             std::cout << "Opening cache transaction...\n";
-            runner::runAction(ctx, 0x01, 0x2D, {});
+            runner::runAction(ctx,
+                              ElectraCommand::Type::FileUpload,
+                              ElectraCommand::Object::FileStagedCache,
+                              {});
             if (runner::exitCode != 0)
                 return;
 
@@ -311,7 +329,10 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
             std::vector<uint8_t> registerParams{ static_cast<uint8_t>(id) };
             registerParams.insert(
                 registerParams.end(), sizeBytes.begin(), sizeBytes.end());
-            runner::runAction(ctx, 0x01, 0x2E, registerParams);
+            runner::runAction(ctx,
+                              ElectraCommand::Type::FileUpload,
+                              ElectraCommand::Object::FileStagedHeader,
+                              registerParams);
             if (runner::exitCode != 0)
                 return;
 
@@ -335,7 +356,11 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
                 // `files send-chunk`) - they'd print a line in between our
                 // own in-place bar updates and break it up.
                 runner::runActionAwaitingAck(
-                    ctx, 0x01, 0x2F, chunkParams, nullptr);
+                    ctx,
+                    ElectraCommand::Type::FileUpload,
+                    ElectraCommand::Object::FileStagedChunk,
+                    chunkParams,
+                    nullptr);
                 if (runner::exitCode != 0)
                     return;
                 sent += len;
@@ -367,8 +392,10 @@ void registerFilesCommands(CLI::App &app, runner::Context &ctx)
             fileObj["md5"] = md5;
             runner::Context commitCtx = ctx;
             commitCtx.timeoutMs = commitTimeoutMs;
-            runner::runAction(
-                commitCtx, 0x04, 0x2D, commands::jsonToBytes(doc));
+            runner::runAction(commitCtx,
+                              ElectraCommand::Type::Update,
+                              ElectraCommand::Object::FileStagedCache,
+                              commands::jsonToBytes(doc));
             if (runner::exitCode != 0)
                 return;
 

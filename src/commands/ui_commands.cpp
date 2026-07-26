@@ -23,6 +23,7 @@
 
 #include "commands/command.hpp"
 #include "commands/common.hpp"
+#include "electra_command.hpp"
 
 void registerUiCommands(CLI::App &app, runner::Context &ctx)
 {
@@ -35,7 +36,10 @@ void registerUiCommands(CLI::App &app, runner::Context &ctx)
                                        "Switch Page (runtime, volatile)");
         sub->add_option("--page", page, "Page number")->required();
         sub->callback([&ctx] {
-            runner::runAction(ctx, 0x09, 0x0A, { static_cast<uint8_t>(page) });
+            runner::runAction(ctx,
+                              ElectraCommand::Type::Switch,
+                              ElectraCommand::Object::Page,
+                              { static_cast<uint8_t>(page) });
         });
     }
     {
@@ -44,7 +48,10 @@ void registerUiCommands(CLI::App &app, runner::Context &ctx)
             "control-set-switch", "Switch Control Set (runtime, volatile)");
         sub->add_option("--set", set, "Control set ID")->required();
         sub->callback([&ctx] {
-            runner::runAction(ctx, 0x09, 0x0B, { static_cast<uint8_t>(set) });
+            runner::runAction(ctx,
+                              ElectraCommand::Type::Switch,
+                              ElectraCommand::Object::ControlSet,
+                              { static_cast<uint8_t>(set) });
         });
     }
     {
@@ -58,7 +65,10 @@ void registerUiCommands(CLI::App &app, runner::Context &ctx)
                 throw std::runtime_error(
                     "bottom bar text must be at most 40 characters");
             }
-            runner::runAction(ctx, 0x14, 0x77, sysex::encodeAscii(text));
+            runner::runAction(ctx,
+                              ElectraCommand::Type::UpdateRuntime,
+                              ElectraCommand::Object::StatusBar,
+                              sysex::encodeAscii(text));
         });
     }
 }

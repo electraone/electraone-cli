@@ -23,6 +23,7 @@
 
 #include "commands/command.hpp"
 #include "commands/common.hpp"
+#include "electra_command.hpp"
 
 void registerControlCommands(CLI::App &app, runner::Context &ctx)
 {
@@ -81,7 +82,10 @@ void registerControlCommands(CLI::App &app, runner::Context &ctx)
                 auto jsonBytes = commands::jsonToBytes(doc);
                 params.insert(params.end(), jsonBytes.begin(), jsonBytes.end());
 
-                runner::runAction(ctx, 0x14, 0x07, params);
+                runner::runAction(ctx,
+                                  ElectraCommand::Type::UpdateRuntime,
+                                  ElectraCommand::Object::Control,
+                                  params);
             });
     }
     {
@@ -106,7 +110,10 @@ void registerControlCommands(CLI::App &app, runner::Context &ctx)
                                          static_cast<uint8_t>(valueId) };
             auto textBytes = sysex::encodeAscii(text);
             params.insert(params.end(), textBytes.begin(), textBytes.end());
-            runner::runAction(ctx, 0x14, 0x0E, params);
+            runner::runAction(ctx,
+                              ElectraCommand::Type::UpdateRuntime,
+                              ElectraCommand::Object::Value,
+                              params);
         });
     }
 }

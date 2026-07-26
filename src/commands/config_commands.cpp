@@ -21,6 +21,7 @@
 
 #include "commands/command.hpp"
 #include "commands/common.hpp"
+#include "electra_command.hpp"
 
 void registerConfigCommands(CLI::App &app, runner::Context &ctx)
 {
@@ -29,7 +30,10 @@ void registerConfigCommands(CLI::App &app, runner::Context &ctx)
     config->require_subcommand(1);
 
     config->add_subcommand("get", "Get Configuration JSON")->callback([&ctx] {
-        runner::runQuery(ctx, 0x02, 0x02, {});
+        runner::runQuery(ctx,
+                         ElectraCommand::Type::FileRequest,
+                         ElectraCommand::Object::FileConfig,
+                         {});
     });
 
     {
@@ -40,10 +44,16 @@ void registerConfigCommands(CLI::App &app, runner::Context &ctx)
         sub->add_option("file", file, "Configuration JSON file")->required();
         sub->callback([&ctx] {
             auto content = runner::readFileOrStdin(file);
-            runner::runAction(ctx, 0x01, 0x02, sysex::encodeAscii(content));
+            runner::runAction(ctx,
+                              ElectraCommand::Type::FileUpload,
+                              ElectraCommand::Object::FileConfig,
+                              sysex::encodeAscii(content));
         });
     }
     config->add_subcommand("remove", "Remove Config")->callback([&ctx] {
-        runner::runAction(ctx, 0x05, 0x02, {});
+        runner::runAction(ctx,
+                          ElectraCommand::Type::Remove,
+                          ElectraCommand::Object::FileConfig,
+                          {});
     });
 }

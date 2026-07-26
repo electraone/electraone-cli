@@ -21,6 +21,7 @@
 
 #include "commands/command.hpp"
 #include "commands/common.hpp"
+#include "electra_command.hpp"
 
 void registerPresetCommands(CLI::App &app, runner::Context &ctx)
 {
@@ -36,8 +37,8 @@ void registerPresetCommands(CLI::App &app, runner::Context &ctx)
         sub->callback([&ctx, bOpt, sOpt] {
             runner::runQuery(
                 ctx,
-                0x02,
-                0x01,
+                ElectraCommand::Type::FileRequest,
+                ElectraCommand::Object::FilePreset,
                 commands::optionalBankSlotParams(bOpt, sOpt, bank, slot));
         });
     }
@@ -48,7 +49,10 @@ void registerPresetCommands(CLI::App &app, runner::Context &ctx)
         sub->add_option("file", file, "Preset JSON file")->required();
         sub->callback([&ctx] {
             auto content = runner::readFileOrStdin(file);
-            runner::runAction(ctx, 0x01, 0x01, sysex::encodeAscii(content));
+            runner::runAction(ctx,
+                              ElectraCommand::Type::FileUpload,
+                              ElectraCommand::Object::FilePreset,
+                              sysex::encodeAscii(content));
         });
     }
     {
@@ -56,8 +60,10 @@ void registerPresetCommands(CLI::App &app, runner::Context &ctx)
         auto *sub = preset->add_subcommand("remove", "Remove Preset");
         commands::addBankSlot(sub, bank, slot, true);
         sub->callback([&ctx] {
-            runner::runAction(
-                ctx, 0x05, 0x01, commands::bankSlotParams(bank, slot));
+            runner::runAction(ctx,
+                              ElectraCommand::Type::Remove,
+                              ElectraCommand::Object::FilePreset,
+                              commands::bankSlotParams(bank, slot));
         });
     }
     {
@@ -65,20 +71,29 @@ void registerPresetCommands(CLI::App &app, runner::Context &ctx)
         auto *sub = preset->add_subcommand("clear-slot", "Clear Preset Slot");
         commands::addBankSlot(sub, bank, slot, true);
         sub->callback([&ctx] {
-            runner::runAction(
-                ctx, 0x05, 0x08, commands::bankSlotParams(bank, slot));
+            runner::runAction(ctx,
+                              ElectraCommand::Type::Remove,
+                              ElectraCommand::Object::PresetSlot,
+                              commands::bankSlotParams(bank, slot));
         });
     }
     preset->add_subcommand("list", "Get Preset List: all presets with metadata")
-        ->callback([&ctx] { runner::runQuery(ctx, 0x02, 0x04, {}); });
+        ->callback([&ctx] {
+            runner::runQuery(ctx,
+                             ElectraCommand::Type::FileRequest,
+                             ElectraCommand::Object::PresetList,
+                             {});
+        });
     {
         static int bank = 0, slot = 0;
         auto *sub = preset->add_subcommand(
             "slot-info", "Get Preset Slot Info: metadata and file checksums");
         commands::addBankSlot(sub, bank, slot, true);
         sub->callback([&ctx] {
-            runner::runQuery(
-                ctx, 0x02, 0x08, commands::bankSlotParams(bank, slot));
+            runner::runQuery(ctx,
+                             ElectraCommand::Type::FileRequest,
+                             ElectraCommand::Object::PresetSlot,
+                             commands::bankSlotParams(bank, slot));
         });
     }
     {
@@ -87,8 +102,10 @@ void registerPresetCommands(CLI::App &app, runner::Context &ctx)
             "switch", "Switch Preset Slot (runtime, volatile)");
         commands::addBankSlot(sub, bank, slot, true);
         sub->callback([&ctx] {
-            runner::runAction(
-                ctx, 0x09, 0x08, commands::bankSlotParams(bank, slot));
+            runner::runAction(ctx,
+                              ElectraCommand::Type::Switch,
+                              ElectraCommand::Object::PresetSlot,
+                              commands::bankSlotParams(bank, slot));
         });
     }
     {
@@ -97,12 +114,17 @@ void registerPresetCommands(CLI::App &app, runner::Context &ctx)
             "set-slot", "Set Preset Slot (runtime, volatile)");
         commands::addBankSlot(sub, bank, slot, true);
         sub->callback([&ctx] {
-            runner::runAction(
-                ctx, 0x14, 0x08, commands::bankSlotParams(bank, slot));
+            runner::runAction(ctx,
+                              ElectraCommand::Type::UpdateRuntime,
+                              ElectraCommand::Object::PresetSlot,
+                              commands::bankSlotParams(bank, slot));
         });
     }
     preset->add_subcommand("reload", "Reload Preset Slot")->callback([&ctx] {
-        runner::runAction(ctx, 0x08, 0x08, {});
+        runner::runAction(ctx,
+                          ElectraCommand::Type::Execute,
+                          ElectraCommand::Object::PresetSlot,
+                          {});
     });
     {
         static int bank = 0, slot = 0;
@@ -116,7 +138,10 @@ void registerPresetCommands(CLI::App &app, runner::Context &ctx)
             doc["bankNumber"] = bank;
             doc["slot"] = slot;
             doc["preset"] = path;
-            runner::runAction(ctx, 0x04, 0x08, commands::jsonToBytes(doc));
+            runner::runAction(ctx,
+                              ElectraCommand::Type::Update,
+                              ElectraCommand::Object::PresetSlot,
+                              commands::jsonToBytes(doc));
         });
     }
 }

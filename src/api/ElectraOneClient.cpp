@@ -27,6 +27,7 @@
 #include <sstream>
 #include <stdexcept>
 
+#include "electra_command.hpp"
 #include "md5.hpp"
 #include "midi_transport.hpp"
 
@@ -94,43 +95,46 @@ namespace electraone
             return i < r.payload.size() ? r.payload[i] : -1;
         };
 
-        if (r.category == 0x7E) {
+        if (r.category == ElectraCommand::Type::Event) {
             switch (r.command) {
-                case 0x02:
+                case ElectraCommand::Event::PresetSwitch:
                     os << "Preset Switch: bank=" << byteAt(0)
                        << " slot=" << byteAt(1);
                     return os.str();
-                case 0x03:
+                case ElectraCommand::Event::SnapshotChange:
                     os << "Snapshot List Change";
                     return os.str();
+                // Not in ElectraCommand::Event (no 0x31 entry there at all) -
+                // byte value unverified against the firmware source.
                 case 0x31:
                     os << "Capture List Change";
                     return os.str();
-                case 0x0A:
+                case ElectraCommand::Event::PotTouch:
                     os << "Pot Touch: pot=" << byteAt(0) << " control="
                        << sysex::decode14bit(static_cast<uint8_t>(byteAt(1)),
                                              static_cast<uint8_t>(byteAt(2)))
                        << " touched=" << byteAt(3);
                     return os.str();
-                case 0x05:
+                case ElectraCommand::Event::PresetListChange:
                     os << "Preset List Change";
                     return os.str();
-                case 0x06:
+                case ElectraCommand::Event::PageSwitch:
                     os << "Page Switch: page=" << byteAt(0);
                     return os.str();
-                case 0x07:
+                case ElectraCommand::Event::ControlSetSwitch:
                     os << "Control Set Switch: set=" << byteAt(0);
                     return os.str();
-                case 0x08:
-                    if (r.payload.empty()) {
-                        os << "USB Host Change";
-                    } else {
-                        os << "Preset Bank Switch: bank=" << byteAt(0);
-                    }
+                case ElectraCommand::Event::PresetBankSwitch:
+                    os << "Preset Bank Switch: bank=" << byteAt(0);
                     return os.str();
-                case 0x04:
+                case ElectraCommand::Event::UsbHostChange:
+                    os << "USB Host Change";
+                    return os.str();
+                case ElectraCommand::Event::SnapshotBankSwitch:
                     os << "Snapshot Bank Switch: bank=" << byteAt(0);
                     return os.str();
+                // Not in ElectraCommand::Event (no 0x2D entry there at all) -
+                // byte value unverified against the firmware source.
                 case 0x2D: {
                     uint32_t bytes = r.payload.size() >= 4
                                          ? sysex::decode28bit(r.payload[0],
@@ -146,12 +150,15 @@ namespace electraone
             }
         }
 
-        if (r.category == 0x7F && r.command == 0x00) {
+        // Command byte 0x00 here isn't in ElectraCommand::Object/Event either -
+        // unverified against the firmware source, kept as a literal.
+        if (r.category == ElectraCommand::Type::SystemCall
+            && r.command == 0x00) {
             os << "Log: " << r.payloadAsText();
             return os.str();
         }
 
-        if (r.category == 0x03) {
+        if (r.category == ElectraCommand::Type::MidiLearnSwitch) {
             os << "MIDI Learn Info: " << static_cast<char>(r.command)
                << r.payloadAsText();
             return os.str();
@@ -270,42 +277,61 @@ namespace electraone
     // ---- Info ----
     std::optional<Response> Client::getElectraInfo()
     {
-        return send(0x02, 0x7F, {});
+        return send(ElectraCommand::Type::FileRequest,
+                    ElectraCommand::Object::ElectraInfo,
+                    {});
     }
 
     std::optional<Response> Client::getRuntimeInfo()
     {
-        return send(0x02, 0x7E, {});
+        return send(ElectraCommand::Type::FileRequest,
+                    ElectraCommand::Object::RuntimeInfo,
+                    {});
     }
 
     std::optional<Response> Client::reboot()
     {
-        return send(0x7F, 0x78, {});
+        return send(ElectraCommand::Type::SystemCall,
+                    ElectraCommand::Object::Reboot,
+                    {});
     }
 
     std::optional<Response> Client::setDebug(bool enabled)
     {
-        return send(0x7C, enabled ? 0x01 : 0x00, {});
+        // 0x7C as a category doesn't correspond to any ElectraCommand::Type
+        // value (translateType would map it to Type::Unknown) - it numerically
+        // matches Object::AppInfo instead. See README.md: this command may not
+        // be recognized by current firmware.
+        return send(ElectraCommand::Object::AppInfo, enabled ? 0x01 : 0x00, {});
     }
 
     std::optional<Response> Client::setMidiLearn(bool enabled)
     {
-        return send(0x03, enabled ? 0x01 : 0x00, {});
+        return send(ElectraCommand::Type::MidiLearnSwitch,
+                    enabled ? ElectraCommand::Object::MidiLearnOn
+                            : ElectraCommand::Object::MidiLearnOff,
+                    {});
     }
 
     std::optional<Response> Client::getUsbHostDevices()
     {
-        return send(0x02, 0x10, {});
+        return send(ElectraCommand::Type::FileRequest,
+                    ElectraCommand::Object::UsbHostList,
+                    {});
     }
 
     std::optional<Response> Client::getParameterMap()
     {
-        return send(0x02, 0x41, {});
+        return send(ElectraCommand::Type::FileRequest,
+                    ElectraCommand::Object::ParameterMap,
+                    {});
     }
 
     std::optional<Response> Client::saveScreenshot()
     {
-        return send(0x7F, 0x76, {});
+        return send(ElectraCommand::Type::SystemCall,
+                    ElectraCommand::Object::Screenshot,
+                    {});
     }
 
     std::optional<Response>
@@ -321,57 +347,77 @@ namespace electraone
         for (uint16_t bp : breakpoints)
             arr.add(bp);
 
-        std::vector<uint8_t> params{ 91 };
+        std::vector<uint8_t> params{ ElectraCommand::Trace::SetBreakpoints };
         auto jsonBytes = jsonToBytes(doc);
         params.insert(params.end(), jsonBytes.begin(), jsonBytes.end());
-        return send(0x14, 0x40, params);
+        return send(ElectraCommand::Type::UpdateRuntime,
+                    ElectraCommand::Object::Trace,
+                    params);
     }
 
     // ---- Preset ----
     std::optional<Response> Client::getPreset(std::optional<int> bank,
                                               std::optional<int> slot)
     {
-        return send(0x02, 0x01, optionalBankSlot(bank, slot));
+        return send(ElectraCommand::Type::FileRequest,
+                    ElectraCommand::Object::FilePreset,
+                    optionalBankSlot(bank, slot));
     }
 
     std::optional<Response> Client::uploadPreset(const std::string &presetJson)
     {
-        return send(0x01, 0x01, sysex::encodeAscii(presetJson));
+        return send(ElectraCommand::Type::FileUpload,
+                    ElectraCommand::Object::FilePreset,
+                    sysex::encodeAscii(presetJson));
     }
 
     std::optional<Response> Client::removePreset(int bank, int slot)
     {
-        return send(0x05, 0x01, bankSlot(bank, slot));
+        return send(ElectraCommand::Type::Remove,
+                    ElectraCommand::Object::FilePreset,
+                    bankSlot(bank, slot));
     }
 
     std::optional<Response> Client::clearPresetSlot(int bank, int slot)
     {
-        return send(0x05, 0x08, bankSlot(bank, slot));
+        return send(ElectraCommand::Type::Remove,
+                    ElectraCommand::Object::PresetSlot,
+                    bankSlot(bank, slot));
     }
 
     std::optional<Response> Client::getPresetList()
     {
-        return send(0x02, 0x04, {});
+        return send(ElectraCommand::Type::FileRequest,
+                    ElectraCommand::Object::PresetList,
+                    {});
     }
 
     std::optional<Response> Client::getPresetSlotInfo(int bank, int slot)
     {
-        return send(0x02, 0x08, bankSlot(bank, slot));
+        return send(ElectraCommand::Type::FileRequest,
+                    ElectraCommand::Object::PresetSlot,
+                    bankSlot(bank, slot));
     }
 
     std::optional<Response> Client::switchPresetSlot(int bank, int slot)
     {
-        return send(0x09, 0x08, bankSlot(bank, slot));
+        return send(ElectraCommand::Type::Switch,
+                    ElectraCommand::Object::PresetSlot,
+                    bankSlot(bank, slot));
     }
 
     std::optional<Response> Client::setPresetSlot(int bank, int slot)
     {
-        return send(0x14, 0x08, bankSlot(bank, slot));
+        return send(ElectraCommand::Type::UpdateRuntime,
+                    ElectraCommand::Object::PresetSlot,
+                    bankSlot(bank, slot));
     }
 
     std::optional<Response> Client::reloadPresetSlot()
     {
-        return send(0x08, 0x08, {});
+        return send(ElectraCommand::Type::Execute,
+                    ElectraCommand::Object::PresetSlot,
+                    {});
     }
 
     std::optional<Response>
@@ -381,78 +427,106 @@ namespace electraone
         doc["bankNumber"] = bank;
         doc["slot"] = slot;
         doc["preset"] = path;
-        return send(0x04, 0x08, jsonToBytes(doc));
+        return send(ElectraCommand::Type::Update,
+                    ElectraCommand::Object::PresetSlot,
+                    jsonToBytes(doc));
     }
 
     // ---- Lua ----
     std::optional<Response> Client::getLuaScript(std::optional<int> bank,
                                                  std::optional<int> slot)
     {
-        return send(0x02, 0x0C, optionalBankSlot(bank, slot));
+        return send(ElectraCommand::Type::FileRequest,
+                    ElectraCommand::Object::FileLua,
+                    optionalBankSlot(bank, slot));
     }
 
     std::optional<Response> Client::uploadLuaScript(const std::string &code)
     {
-        return send(0x01, 0x0C, sysex::encodeAscii(code));
+        return send(ElectraCommand::Type::FileUpload,
+                    ElectraCommand::Object::FileLua,
+                    sysex::encodeAscii(code));
     }
 
     std::optional<Response> Client::removeLuaScript(int bank, int slot)
     {
-        return send(0x05, 0x0C, bankSlot(bank, slot));
+        return send(ElectraCommand::Type::Remove,
+                    ElectraCommand::Object::FileLua,
+                    bankSlot(bank, slot));
     }
 
     std::optional<Response> Client::executeLuaCommand(const std::string &code)
     {
-        return send(0x08, 0x0D, sysex::encodeAscii(code));
+        return send(ElectraCommand::Type::Execute,
+                    ElectraCommand::Object::Function,
+                    sysex::encodeAscii(code));
     }
 
     // ---- Overrides / Persisted / Performance / Config ----
     std::optional<Response> Client::getDeviceOverrides(std::optional<int> bank,
                                                        std::optional<int> slot)
     {
-        return send(0x02, 0x0F, optionalBankSlot(bank, slot));
+        return send(ElectraCommand::Type::FileRequest,
+                    ElectraCommand::Object::DeviceList,
+                    optionalBankSlot(bank, slot));
     }
 
     std::optional<Response>
         Client::uploadDeviceOverrides(const std::string &json)
     {
-        return send(0x01, 0x0F, sysex::encodeAscii(json));
+        return send(ElectraCommand::Type::FileUpload,
+                    ElectraCommand::Object::DeviceList,
+                    sysex::encodeAscii(json));
     }
 
     std::optional<Response> Client::getPersistedData(std::optional<int> bank,
                                                      std::optional<int> slot)
     {
-        return send(0x02, 0x12, optionalBankSlot(bank, slot));
+        return send(ElectraCommand::Type::FileRequest,
+                    ElectraCommand::Object::Datafile,
+                    optionalBankSlot(bank, slot));
     }
 
     std::optional<Response> Client::uploadPersistedData(const std::string &json)
     {
-        return send(0x01, 0x12, sysex::encodeAscii(json));
+        return send(ElectraCommand::Type::FileUpload,
+                    ElectraCommand::Object::Datafile,
+                    sysex::encodeAscii(json));
     }
 
     std::optional<Response> Client::getPerformance(int bank, int slot)
     {
-        return send(0x02, 0x11, bankSlot(bank, slot));
+        return send(ElectraCommand::Type::FileRequest,
+                    ElectraCommand::Object::Performance,
+                    bankSlot(bank, slot));
     }
 
     std::optional<Response> Client::uploadPerformance(const std::string &json)
     {
-        return send(0x01, 0x11, sysex::encodeAscii(json));
+        return send(ElectraCommand::Type::FileUpload,
+                    ElectraCommand::Object::Performance,
+                    sysex::encodeAscii(json));
     }
 
     std::optional<Response> Client::getConfiguration()
     {
-        return send(0x02, 0x02, {});
+        return send(ElectraCommand::Type::FileRequest,
+                    ElectraCommand::Object::FileConfig,
+                    {});
     }
 
     std::optional<Response> Client::uploadConfiguration(const std::string &json)
     {
-        return send(0x01, 0x02, sysex::encodeAscii(json));
+        return send(ElectraCommand::Type::FileUpload,
+                    ElectraCommand::Object::FileConfig,
+                    sysex::encodeAscii(json));
     }
 
     std::optional<Response> Client::removeConfig()
     {
-        return send(0x05, 0x02, {});
+        return send(ElectraCommand::Type::Remove,
+                    ElectraCommand::Object::FileConfig,
+                    {});
     }
 
     // ---- Snapshot ----
@@ -461,7 +535,9 @@ namespace electraone
     {
         JsonDocument doc;
         doc["projectId"] = projectId;
-        return send(0x02, 0x05, jsonToBytes(doc));
+        return send(ElectraCommand::Type::FileRequest,
+                    ElectraCommand::Object::SnapshotList,
+                    jsonToBytes(doc));
     }
 
     std::optional<Response>
@@ -469,7 +545,9 @@ namespace electraone
                                 int bank,
                                 int slot)
     {
-        return send(0x02, 0x03, projectSlotJson(projectId, bank, slot));
+        return send(ElectraCommand::Type::FileRequest,
+                    ElectraCommand::Object::FileSnapshot,
+                    projectSlotJson(projectId, bank, slot));
     }
 
     std::optional<Response> Client::updateSnapshot(const std::string &projectId,
@@ -484,13 +562,17 @@ namespace electraone
         doc["slot"] = slot;
         doc["name"] = name;
         doc["color"] = color;
-        return send(0x04, 0x06, jsonToBytes(doc));
+        return send(ElectraCommand::Type::Update,
+                    ElectraCommand::Object::SnapshotInfo,
+                    jsonToBytes(doc));
     }
 
     std::optional<Response>
         Client::removeSnapshot(const std::string &projectId, int bank, int slot)
     {
-        return send(0x05, 0x06, projectSlotJson(projectId, bank, slot));
+        return send(ElectraCommand::Type::Remove,
+                    ElectraCommand::Object::SnapshotInfo,
+                    projectSlotJson(projectId, bank, slot));
     }
 
     std::optional<Response> Client::swapSnapshots(const std::string &projectId,
@@ -505,7 +587,9 @@ namespace electraone
         doc["fromSlot"] = fromSlot;
         doc["toBankNumber"] = toBank;
         doc["toSlot"] = toSlot;
-        return send(0x06, 0x06, jsonToBytes(doc));
+        return send(ElectraCommand::Type::Swap,
+                    ElectraCommand::Object::SnapshotInfo,
+                    jsonToBytes(doc));
     }
 
     std::optional<Response>
@@ -513,7 +597,9 @@ namespace electraone
                                 int bank,
                                 int slot)
     {
-        return send(0x14, 0x09, projectSlotJson(projectId, bank, slot));
+        return send(ElectraCommand::Type::UpdateRuntime,
+                    ElectraCommand::Object::SnapshotSlot,
+                    projectSlotJson(projectId, bank, slot));
     }
 
     // ---- Capture ----
@@ -522,13 +608,17 @@ namespace electraone
     {
         JsonDocument doc;
         doc["projectId"] = projectId;
-        return send(0x02, 0x31, jsonToBytes(doc));
+        return send(ElectraCommand::Type::FileRequest,
+                    ElectraCommand::Object::CaptureList,
+                    jsonToBytes(doc));
     }
 
     std::optional<Response>
         Client::getCaptureData(const std::string &projectId, int bank, int slot)
     {
-        return send(0x02, 0x30, projectSlotJson(projectId, bank, slot));
+        return send(ElectraCommand::Type::FileRequest,
+                    ElectraCommand::Object::FileCapture,
+                    projectSlotJson(projectId, bank, slot));
     }
 
     std::optional<Response> Client::updateCapture(const std::string &projectId,
@@ -543,13 +633,17 @@ namespace electraone
         doc["slot"] = slot;
         doc["name"] = name;
         doc["color"] = color;
-        return send(0x04, 0x32, jsonToBytes(doc));
+        return send(ElectraCommand::Type::Update,
+                    ElectraCommand::Object::CaptureInfo,
+                    jsonToBytes(doc));
     }
 
     std::optional<Response>
         Client::removeCapture(const std::string &projectId, int bank, int slot)
     {
-        return send(0x05, 0x32, projectSlotJson(projectId, bank, slot));
+        return send(ElectraCommand::Type::Remove,
+                    ElectraCommand::Object::CaptureInfo,
+                    projectSlotJson(projectId, bank, slot));
     }
 
     std::optional<Response> Client::swapCaptures(const std::string &projectId,
@@ -564,13 +658,17 @@ namespace electraone
         doc["fromSlot"] = fromSlot;
         doc["toBankNumber"] = toBank;
         doc["toSlot"] = toSlot;
-        return send(0x06, 0x32, jsonToBytes(doc));
+        return send(ElectraCommand::Type::Swap,
+                    ElectraCommand::Object::CaptureInfo,
+                    jsonToBytes(doc));
     }
 
     std::optional<Response>
         Client::setCaptureSlot(const std::string &projectId, int bank, int slot)
     {
-        return send(0x14, 0x33, projectSlotJson(projectId, bank, slot));
+        return send(ElectraCommand::Type::UpdateRuntime,
+                    ElectraCommand::Object::CaptureSlot,
+                    projectSlotJson(projectId, bank, slot));
     }
 
     // ---- Control ----
@@ -596,7 +694,9 @@ namespace electraone
         auto jsonBytes = jsonToBytes(doc);
         params.insert(params.end(), jsonBytes.begin(), jsonBytes.end());
 
-        return send(0x14, 0x07, params);
+        return send(ElectraCommand::Type::UpdateRuntime,
+                    ElectraCommand::Object::Control,
+                    params);
     }
 
     std::optional<Response>
@@ -611,18 +711,24 @@ namespace electraone
                                      static_cast<uint8_t>(valueId) };
         auto textBytes = sysex::encodeAscii(text);
         params.insert(params.end(), textBytes.begin(), textBytes.end());
-        return send(0x14, 0x0E, params);
+        return send(ElectraCommand::Type::UpdateRuntime,
+                    ElectraCommand::Object::Value,
+                    params);
     }
 
     // ---- UI ----
     std::optional<Response> Client::switchPage(int page)
     {
-        return send(0x09, 0x0A, { static_cast<uint8_t>(page) });
+        return send(ElectraCommand::Type::Switch,
+                    ElectraCommand::Object::Page,
+                    { static_cast<uint8_t>(page) });
     }
 
     std::optional<Response> Client::switchControlSet(int set)
     {
-        return send(0x09, 0x0B, { static_cast<uint8_t>(set) });
+        return send(ElectraCommand::Type::Switch,
+                    ElectraCommand::Object::ControlSet,
+                    { static_cast<uint8_t>(set) });
     }
 
     std::optional<Response> Client::setBottomBarText(const std::string &text)
@@ -630,13 +736,17 @@ namespace electraone
         if (text.size() > 40)
             throw std::runtime_error(
                 "bottom bar text must be at most 40 characters");
-        return send(0x14, 0x77, sysex::encodeAscii(text));
+        return send(ElectraCommand::Type::UpdateRuntime,
+                    ElectraCommand::Object::StatusBar,
+                    sysex::encodeAscii(text));
     }
 
     // ---- Events / Logger / Window ----
     std::optional<Response> Client::setEventsMidiPort(Port port)
     {
-        return send(0x14, 0x7B, { static_cast<uint8_t>(port) });
+        return send(ElectraCommand::Type::UpdateRuntime,
+                    ElectraCommand::Object::ControlPort,
+                    { static_cast<uint8_t>(port) });
     }
 
     std::optional<Response> Client::subscribeEvents(const EventFlags &flags)
@@ -656,38 +766,52 @@ namespace electraone
             byte |= 1 << 5;
         if (flags.window)
             byte |= 1 << 6;
-        return send(0x14, 0x79, { byte });
+        return send(ElectraCommand::Type::UpdateRuntime,
+                    ElectraCommand::Object::EventSubscription,
+                    { byte });
     }
 
     std::optional<Response> Client::enableLogger()
     {
-        return send(0x7F, 0x7D, { 0x01, 0x00 });
+        return send(ElectraCommand::Type::SystemCall,
+                    ElectraCommand::Object::Logger,
+                    { 0x01, 0x00 });
     }
 
     std::optional<Response> Client::disableLogger()
     {
-        return send(0x7F, 0x7D, { 0x00, 0x00 });
+        return send(ElectraCommand::Type::SystemCall,
+                    ElectraCommand::Object::Logger,
+                    { 0x00, 0x00 });
     }
 
     std::optional<Response> Client::setLoggerMidiPort(Port port)
     {
-        return send(0x14, 0x7D, { static_cast<uint8_t>(port), 0x00 });
+        return send(ElectraCommand::Type::UpdateRuntime,
+                    ElectraCommand::Object::Logger,
+                    { static_cast<uint8_t>(port), 0x00 });
     }
 
     std::optional<Response> Client::stopWindowRepaints()
     {
-        return send(0x7F, 0x7A, { 0x00, 0x00 });
+        return send(ElectraCommand::Type::SystemCall,
+                    ElectraCommand::Object::Window,
+                    { 0x00, 0x00 });
     }
 
     std::optional<Response> Client::resumeWindowRepaints()
     {
-        return send(0x7F, 0x7A, { 0x01, 0x00 });
+        return send(ElectraCommand::Type::SystemCall,
+                    ElectraCommand::Object::Window,
+                    { 0x01, 0x00 });
     }
 
     // ---- File Transfer ----
     std::optional<Response> Client::openCacheTransaction()
     {
-        return send(0x01, 0x2D, {});
+        return send(ElectraCommand::Type::FileUpload,
+                    ElectraCommand::Object::FileStagedCache,
+                    {});
     }
 
     std::optional<Response> Client::registerFile(int id, uint32_t size)
@@ -695,7 +819,9 @@ namespace electraone
         auto sizeBytes = sysex::encode28bit(size);
         std::vector<uint8_t> params{ static_cast<uint8_t>(id) };
         params.insert(params.end(), sizeBytes.begin(), sizeBytes.end());
-        return send(0x01, 0x2E, params);
+        return send(ElectraCommand::Type::FileUpload,
+                    ElectraCommand::Object::FileStagedHeader,
+                    params);
     }
 
     std::optional<Response> Client::sendChunk(
@@ -714,8 +840,10 @@ namespace electraone
         if (!impl_->connected)
             throw std::runtime_error(
                 "electraone::Client is not connected - call connect() first");
-        auto msg = sysex::buildMessage(
-            0x01, 0x2F, params, impl_->options.transactionId);
+        auto msg = sysex::buildMessage(ElectraCommand::Type::FileUpload,
+                                       ElectraCommand::Object::FileStagedChunk,
+                                       params,
+                                       impl_->options.transactionId);
         impl_->transport.send(msg);
 
         while (true) {
@@ -732,19 +860,26 @@ namespace electraone
     std::optional<Response>
         Client::commitTransaction(const std::string &commitJson, int timeoutMs)
     {
-        return send(0x04, 0x2D, sysex::encodeAscii(commitJson), timeoutMs);
+        return send(ElectraCommand::Type::Update,
+                    ElectraCommand::Object::FileStagedCache,
+                    sysex::encodeAscii(commitJson),
+                    timeoutMs);
     }
 
     std::optional<Response>
         Client::getLocationFiles(const std::string &locationJson)
     {
-        return send(0x02, 0x34, sysex::encodeAscii(locationJson));
+        return send(ElectraCommand::Type::FileRequest,
+                    ElectraCommand::Object::Location,
+                    sysex::encodeAscii(locationJson));
     }
 
     std::optional<Response>
         Client::removeLocationFiles(const std::string &locationJson)
     {
-        return send(0x05, 0x34, sysex::encodeAscii(locationJson));
+        return send(ElectraCommand::Type::Remove,
+                    ElectraCommand::Object::Location,
+                    sysex::encodeAscii(locationJson));
     }
 
     Response Client::uploadFile(const std::vector<uint8_t> &content,

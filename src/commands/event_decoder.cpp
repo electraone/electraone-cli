@@ -27,6 +27,8 @@
 #include <iostream>
 #include <sstream>
 
+#include "electra_command.hpp"
+
 namespace commands
 {
 
@@ -75,43 +77,46 @@ namespace commands
             return i < r.payload.size() ? r.payload[i] : -1;
         };
 
-        if (r.category == 0x7E) {
+        if (r.category == ElectraCommand::Type::Event) {
             switch (r.command) {
-                case 0x02:
+                case ElectraCommand::Event::PresetSwitch:
                     os << "Preset Switch: bank=" << byteAt(0)
                        << " slot=" << byteAt(1);
                     return os.str();
-                case 0x03:
+                case ElectraCommand::Event::SnapshotChange:
                     os << "Snapshot List Change";
                     return os.str();
+                // Not in ElectraCommand::Event (no 0x31 entry there at all) -
+                // byte value unverified against the firmware source.
                 case 0x31:
                     os << "Capture List Change";
                     return os.str();
-                case 0x0A:
+                case ElectraCommand::Event::PotTouch:
                     os << "Pot Touch: pot=" << byteAt(0) << " control="
                        << sysex::decode14bit(static_cast<uint8_t>(byteAt(1)),
                                              static_cast<uint8_t>(byteAt(2)))
                        << " touched=" << byteAt(3);
                     return os.str();
-                case 0x05:
+                case ElectraCommand::Event::PresetListChange:
                     os << "Preset List Change";
                     return os.str();
-                case 0x06:
+                case ElectraCommand::Event::PageSwitch:
                     os << "Page Switch: page=" << byteAt(0);
                     return os.str();
-                case 0x07:
+                case ElectraCommand::Event::ControlSetSwitch:
                     os << "Control Set Switch: set=" << byteAt(0);
                     return os.str();
-                case 0x08:
-                    if (r.payload.empty()) {
-                        os << "USB Host Change";
-                    } else {
-                        os << "Preset Bank Switch: bank=" << byteAt(0);
-                    }
+                case ElectraCommand::Event::PresetBankSwitch:
+                    os << "Preset Bank Switch: bank=" << byteAt(0);
                     return os.str();
-                case 0x04:
+                case ElectraCommand::Event::UsbHostChange:
+                    os << "USB Host Change";
+                    return os.str();
+                case ElectraCommand::Event::SnapshotBankSwitch:
                     os << "Snapshot Bank Switch: bank=" << byteAt(0);
                     return os.str();
+                // Not in ElectraCommand::Event (no 0x2D entry there at all) -
+                // byte value unverified against the firmware source.
                 case 0x2D: {
                     uint32_t bytes = r.payload.size() >= 4
                                          ? sysex::decode28bit(r.payload[0],
@@ -127,12 +132,15 @@ namespace commands
             }
         }
 
-        if (r.category == 0x7F && r.command == 0x00) {
+        // Command byte 0x00 here isn't in ElectraCommand::Object/Event either -
+        // unverified against the firmware source, kept as a literal.
+        if (r.category == ElectraCommand::Type::SystemCall
+            && r.command == 0x00) {
             os << "Log: " << r.payloadAsText();
             return os.str();
         }
 
-        if (r.category == 0x03) {
+        if (r.category == ElectraCommand::Type::MidiLearnSwitch) {
             // Control MIDI Learn's unsolicited data event has only a single
             // header byte (0x03) before the JSON payload, unlike every other
             // command, so the "command" byte parseResponse split off is really

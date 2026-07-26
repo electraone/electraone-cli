@@ -21,6 +21,7 @@
 
 #include "commands/command.hpp"
 #include "commands/common.hpp"
+#include "electra_command.hpp"
 
 void registerWindowCommands(CLI::App &app, runner::Context &ctx)
 {
@@ -28,9 +29,16 @@ void registerWindowCommands(CLI::App &app, runner::Context &ctx)
     window->require_subcommand(1);
 
     window->add_subcommand("stop", "Stop window repaints")->callback([&ctx] {
-        runner::runAction(ctx, 0x7F, 0x7A, { 0x00, 0x00 });
+        runner::runAction(ctx,
+                          ElectraCommand::Type::SystemCall,
+                          ElectraCommand::Object::Window,
+                          { 0x00, 0x00 });
     });
     window->add_subcommand("resume", "Resume window repaints")
-        ->callback(
-            [&ctx] { runner::runAction(ctx, 0x7F, 0x7A, { 0x01, 0x00 }); });
+        ->callback([&ctx] {
+            runner::runAction(ctx,
+                              ElectraCommand::Type::SystemCall,
+                              ElectraCommand::Object::Window,
+                              { 0x01, 0x00 });
+        });
 }

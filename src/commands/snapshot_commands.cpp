@@ -21,6 +21,7 @@
 
 #include "commands/command.hpp"
 #include "commands/common.hpp"
+#include "electra_command.hpp"
 
 namespace
 {
@@ -50,7 +51,10 @@ void registerSnapshotCommands(CLI::App &app, runner::Context &ctx)
         sub->callback([&ctx] {
             JsonDocument doc;
             doc["projectId"] = projectId;
-            runner::runQuery(ctx, 0x02, 0x05, commands::jsonToBytes(doc));
+            runner::runQuery(ctx,
+                             ElectraCommand::Type::FileRequest,
+                             ElectraCommand::Object::SnapshotList,
+                             commands::jsonToBytes(doc));
         });
     }
     {
@@ -61,8 +65,10 @@ void registerSnapshotCommands(CLI::App &app, runner::Context &ctx)
         sub->add_option("--project-id", projectId, "Project ID")->required();
         commands::addBankSlot(sub, bank, slot, true);
         sub->callback([&ctx] {
-            runner::runQuery(
-                ctx, 0x02, 0x03, projectSlotJson(projectId, bank, slot));
+            runner::runQuery(ctx,
+                             ElectraCommand::Type::FileRequest,
+                             ElectraCommand::Object::FileSnapshot,
+                             projectSlotJson(projectId, bank, slot));
         });
     }
     {
@@ -81,7 +87,10 @@ void registerSnapshotCommands(CLI::App &app, runner::Context &ctx)
             doc["slot"] = slot;
             doc["name"] = name;
             doc["color"] = color;
-            runner::runAction(ctx, 0x04, 0x06, commands::jsonToBytes(doc));
+            runner::runAction(ctx,
+                              ElectraCommand::Type::Update,
+                              ElectraCommand::Object::SnapshotInfo,
+                              commands::jsonToBytes(doc));
         });
     }
     {
@@ -91,8 +100,10 @@ void registerSnapshotCommands(CLI::App &app, runner::Context &ctx)
         sub->add_option("--project-id", projectId, "Project ID")->required();
         commands::addBankSlot(sub, bank, slot, true);
         sub->callback([&ctx] {
-            runner::runAction(
-                ctx, 0x05, 0x06, projectSlotJson(projectId, bank, slot));
+            runner::runAction(ctx,
+                              ElectraCommand::Type::Remove,
+                              ElectraCommand::Object::SnapshotInfo,
+                              projectSlotJson(projectId, bank, slot));
         });
     }
     {
@@ -111,7 +122,10 @@ void registerSnapshotCommands(CLI::App &app, runner::Context &ctx)
             doc["fromSlot"] = fromSlot;
             doc["toBankNumber"] = toBank;
             doc["toSlot"] = toSlot;
-            runner::runAction(ctx, 0x06, 0x06, commands::jsonToBytes(doc));
+            runner::runAction(ctx,
+                              ElectraCommand::Type::Swap,
+                              ElectraCommand::Object::SnapshotInfo,
+                              commands::jsonToBytes(doc));
         });
     }
     {
@@ -122,8 +136,10 @@ void registerSnapshotCommands(CLI::App &app, runner::Context &ctx)
         sub->add_option("--project-id", projectId, "Project ID")->required();
         commands::addBankSlot(sub, bank, slot, true);
         sub->callback([&ctx] {
-            runner::runAction(
-                ctx, 0x14, 0x09, projectSlotJson(projectId, bank, slot));
+            runner::runAction(ctx,
+                              ElectraCommand::Type::UpdateRuntime,
+                              ElectraCommand::Object::SnapshotSlot,
+                              projectSlotJson(projectId, bank, slot));
         });
     }
 }

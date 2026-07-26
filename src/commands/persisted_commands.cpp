@@ -21,6 +21,7 @@
 
 #include "commands/command.hpp"
 #include "commands/common.hpp"
+#include "electra_command.hpp"
 
 void registerPersistedCommands(CLI::App &app, runner::Context &ctx)
 {
@@ -39,8 +40,8 @@ void registerPersistedCommands(CLI::App &app, runner::Context &ctx)
         sub->callback([&ctx, bOpt, sOpt] {
             runner::runQuery(
                 ctx,
-                0x02,
-                0x12,
+                ElectraCommand::Type::FileRequest,
+                ElectraCommand::Object::Datafile,
                 commands::optionalBankSlotParams(bOpt, sOpt, bank, slot));
         });
     }
@@ -52,7 +53,10 @@ void registerPersistedCommands(CLI::App &app, runner::Context &ctx)
         sub->add_option("file", file, "Persisted data JSON file")->required();
         sub->callback([&ctx] {
             auto content = runner::readFileOrStdin(file);
-            runner::runAction(ctx, 0x01, 0x12, sysex::encodeAscii(content));
+            runner::runAction(ctx,
+                              ElectraCommand::Type::FileUpload,
+                              ElectraCommand::Object::Datafile,
+                              sysex::encodeAscii(content));
         });
     }
 }

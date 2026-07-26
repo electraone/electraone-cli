@@ -86,14 +86,14 @@ TEST_CASE("describeEvent: Page Switch and Control Set Switch")
           == "Control Set Switch: set=2");
 }
 
-TEST_CASE(
-    "describeEvent: disambiguates the documented 0x7E/0x08 byte collision by payload length")
+TEST_CASE("describeEvent: Preset Bank Switch and USB Host Change are distinct")
 {
-    // See README.md "Known documentation ambiguities": Preset Bank Switch and
-    // USB Host Change share the same category/command bytes in the docs.
-    CHECK(describeEvent(makeResponse(0x7E, 0x08, {})) == "USB Host Change");
+    // The firmware's own ElectraCommand::Event enum has PresetBankSwitch=0x08
+    // and UsbHostChange=0x09 as separate values (no collision) - the docs'
+    // suggestion that they share byte 0x08 was wrong.
     CHECK(describeEvent(makeResponse(0x7E, 0x08, { 6 }))
           == "Preset Bank Switch: bank=6");
+    CHECK(describeEvent(makeResponse(0x7E, 0x09, {})) == "USB Host Change");
 }
 
 TEST_CASE("describeEvent: Snapshot Bank Switch")

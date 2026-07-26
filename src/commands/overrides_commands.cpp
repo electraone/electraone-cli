@@ -21,6 +21,7 @@
 
 #include "commands/command.hpp"
 #include "commands/common.hpp"
+#include "electra_command.hpp"
 
 void registerOverridesCommands(CLI::App &app, runner::Context &ctx)
 {
@@ -38,8 +39,8 @@ void registerOverridesCommands(CLI::App &app, runner::Context &ctx)
         sub->callback([&ctx, bOpt, sOpt] {
             runner::runQuery(
                 ctx,
-                0x02,
-                0x0F,
+                ElectraCommand::Type::FileRequest,
+                ElectraCommand::Object::DeviceList,
                 commands::optionalBankSlotParams(bOpt, sOpt, bank, slot));
         });
     }
@@ -51,7 +52,10 @@ void registerOverridesCommands(CLI::App &app, runner::Context &ctx)
         sub->add_option("file", file, "Device overrides JSON file")->required();
         sub->callback([&ctx] {
             auto content = runner::readFileOrStdin(file);
-            runner::runAction(ctx, 0x01, 0x0F, sysex::encodeAscii(content));
+            runner::runAction(ctx,
+                              ElectraCommand::Type::FileUpload,
+                              ElectraCommand::Object::DeviceList,
+                              sysex::encodeAscii(content));
         });
     }
 }

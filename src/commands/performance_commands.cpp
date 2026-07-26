@@ -21,6 +21,7 @@
 
 #include "commands/command.hpp"
 #include "commands/common.hpp"
+#include "electra_command.hpp"
 
 void registerPerformanceCommands(CLI::App &app, runner::Context &ctx)
 {
@@ -34,8 +35,10 @@ void registerPerformanceCommands(CLI::App &app, runner::Context &ctx)
             performance->add_subcommand("get", "Get Performance layout JSON");
         commands::addBankSlot(sub, bank, slot, true);
         sub->callback([&ctx] {
-            runner::runQuery(
-                ctx, 0x02, 0x11, commands::bankSlotParams(bank, slot));
+            runner::runQuery(ctx,
+                             ElectraCommand::Type::FileRequest,
+                             ElectraCommand::Object::Performance,
+                             commands::bankSlotParams(bank, slot));
         });
     }
     {
@@ -47,7 +50,10 @@ void registerPerformanceCommands(CLI::App &app, runner::Context &ctx)
             ->required();
         sub->callback([&ctx] {
             auto content = runner::readFileOrStdin(file);
-            runner::runAction(ctx, 0x01, 0x11, sysex::encodeAscii(content));
+            runner::runAction(ctx,
+                              ElectraCommand::Type::FileUpload,
+                              ElectraCommand::Object::Performance,
+                              sysex::encodeAscii(content));
         });
     }
 }
