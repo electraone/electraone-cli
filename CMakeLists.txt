@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(electraone_cli CXX)
+project(electraone_cli VERSION 1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -101,7 +101,17 @@ install(FILES
 )
 
 # ---- electraone CLI ------------------------------------------------------------
-add_executable(electraone
+# Single source of truth for the CLI's displayed/binary name, propagated into
+# the app via the generated electraone_version.hpp header below.
+set(ELECTRAONE_CLI_NAME "electraone")
+
+configure_file(
+  src/electraone_version.hpp.in
+  ${CMAKE_BINARY_DIR}/generated/electraone_version.hpp
+  @ONLY
+)
+
+add_executable(${ELECTRAONE_CLI_NAME}
   src/main.cpp
   src/sysex.cpp
   src/midi_transport.cpp
@@ -128,15 +138,15 @@ add_executable(electraone
   src/commands/raw_commands.cpp
 )
 
-target_include_directories(electraone PRIVATE src include)
+target_include_directories(${ELECTRAONE_CLI_NAME} PRIVATE src include ${CMAKE_BINARY_DIR}/generated)
 
-target_link_libraries(electraone PRIVATE
+target_link_libraries(${ELECTRAONE_CLI_NAME} PRIVATE
   ${RTMIDI_TARGET}
   ${CLI11_TARGET}
   ArduinoJson
 )
 
-install(TARGETS electraone RUNTIME DESTINATION bin)
+install(TARGETS ${ELECTRAONE_CLI_NAME} RUNTIME DESTINATION bin)
 
 # ---- examples ---------------------------------------------------------------
 # Built the same way on every platform via `cmake --build build` - no manual

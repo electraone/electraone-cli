@@ -25,15 +25,18 @@
 #include "commands/command.hpp"
 #include "commands/common.hpp"
 #include "commands/runner.hpp"
+#include "electraone_version.hpp"
 #include "midi_transport.hpp"
 
 int main(int argc, char **argv)
 {
-    CLI::App app{
-        "electraone - command-line suite for the Electra One SysEx protocol\n"
-        "version 1.0\n"
-        "https://docs.electra.one/developers/midiimplementation.html"
-    };
+    CLI::App app{ ELECTRAONE_CLI_NAME
+                  " - command-line suite for the Electra One SysEx protocol\n"
+                  "version " ELECTRAONE_CLI_VERSION "\n"
+                  "https://docs.electra.one/developers/midiimplementation.html",
+                  ELECTRAONE_CLI_NAME };
+    app.set_version_flag("--version",
+                         ELECTRAONE_CLI_NAME " " ELECTRAONE_CLI_VERSION);
     app.require_subcommand(1);
 
     auto *listPortsCmd = app.add_subcommand(
