@@ -21,11 +21,13 @@
 
 #pragma once
 
-/*
- * Minimal self-contained MD5 (RFC 1321). Used only to compute the checksum
- * the Electra file-transfer Commit Transaction JSON requires - not for any
- * security purpose, so a small hand-rolled implementation is fine here
- * rather than pulling in a crypto library.
+/**
+ * @file md5.hpp
+ *
+ * @brief Minimal self-contained MD5 (RFC 1321). Used only to compute the
+ * checksum the Electra file-transfer Commit Transaction JSON requires - not
+ * for any security purpose, so a small hand-rolled implementation is fine
+ * here rather than pulling in a crypto library.
  */
 
 #include <cstdint>
@@ -35,12 +37,19 @@
 namespace md5detail
 {
 
+    /// @brief Rotates x left by c bits.
     inline uint32_t leftRotate(uint32_t x, uint32_t c)
     {
         return (x << c) | (x >> (32 - c));
     }
 
 } // namespace md5detail
+
+/**
+ * @brief Computes the MD5 digest of a byte buffer.
+ * @param input Bytes to hash.
+ * @return 32 lowercase hex characters.
+ */
 
 inline std::string md5Hex(const std::vector<uint8_t> &input)
 {
@@ -130,6 +139,9 @@ inline std::string md5Hex(const std::vector<uint8_t> &input)
     return out;
 }
 
+/// @copybrief md5Hex(const std::vector<uint8_t> &)
+/// @param input Text to hash.
+/// @return 32 lowercase hex characters.
 inline std::string md5Hex(const std::string &input)
 {
     return md5Hex(std::vector<uint8_t>(input.begin(), input.end()));

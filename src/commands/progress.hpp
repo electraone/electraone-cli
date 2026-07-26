@@ -19,6 +19,12 @@
 * along with this program.
 */
 
+/**
+ * @file progress.hpp
+ *
+ * @brief Progress bar rendering for `files upload`'s chunk-sending loop.
+ */
+
 #pragma once
 
 #include <cstddef>
@@ -26,6 +32,13 @@
 
 namespace commands
 {
+    /**
+     * @brief Renders a single-line progress bar, e.g. "[==>    ] 40%".
+     * @param sent Bytes sent so far.
+     * @param total Total bytes to send; 0 renders as complete.
+     * @param barWidth Width of the bar itself, in characters.
+     * @return The rendered line (no trailing newline).
+     */
     std::string formatProgressBar(size_t sent, size_t total, int barWidth = 30);
 
-}
+} // namespace commands

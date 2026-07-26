@@ -19,6 +19,13 @@
 * along with this program.
 */
 
+/**
+ * @file event_decoder.hpp
+ *
+ * @brief Renders unsolicited/incoming Electra SysEx messages as
+ * human-readable lines, for `events listen` / `logger listen`.
+ */
+
 #pragma once
 
 #include <string>
@@ -28,17 +35,27 @@
 namespace commands
 {
 
-    // Renders an incoming unsolicited Electra SysEx message (ACK/NACK, Preset
-    // Switch, Pot Touch, Log Message, MIDI Learn Info, ...) as a single
-    // human-readable line, for use in `events listen` / `logger listen`.
+    /**
+     * @brief Renders an incoming unsolicited Electra SysEx message (ACK/NACK,
+     * Preset Switch, Pot Touch, Log Message, MIDI Learn Info, ...) as a
+     * single human-readable line.
+     * @param resp Message to describe.
+     * @return The rendered description.
+     */
     std::string describeEvent(const sysex::ParsedResponse &resp);
 
-    // Prints describeEvent(resp) to stdout, prefixed with the current wall-clock
-    // time ([HH:MM:SS.mmm]). Used as the listen callback for both `events
-    // listen` and `logger listen`, so a merged log+event stream stays easy to
-    // read chronologically - every line gets a timestamp, not just log lines,
-    // since once the two are interleaved a consistent host-side clock is what
-    // makes the stream readable at a glance.
+    /**
+     * @brief Prints describeEvent(resp) to stdout, prefixed with the current
+     * wall-clock time ([HH:MM:SS.mmm]).
+     *
+     * Used as the listen callback for both `events listen` and `logger
+     * listen`, so a merged log+event stream stays easy to read
+     * chronologically - every line gets a timestamp, not just log lines,
+     * since once the two are interleaved a consistent host-side clock is
+     * what makes the stream readable at a glance.
+     *
+     * @param resp Message to print.
+     */
     void printEventWithTimestamp(const sysex::ParsedResponse &resp);
 
 } // namespace commands

@@ -19,6 +19,14 @@
 * along with this program.
 */
 
+/**
+ * @file common.hpp
+ *
+ * @brief Shared helpers used by the "_commands.cpp" command-group
+ * registration functions: CLI11 option builders and small SysEx payload
+ * encoders that would otherwise be duplicated across every command group.
+ */
+
 #pragma once
 
 #include <ArduinoJson.h>
@@ -38,8 +46,13 @@
 namespace commands
 {
 
-    // Parses the "port1" / "port2" / "ctrl" selector used by Set Events MIDI
-    // Port and Set Logger MIDI Port into its wire byte.
+    /**
+     * @brief Parses the "port1" / "port2" / "ctrl" selector used by Set
+     * Events MIDI Port and Set Logger MIDI Port into its wire byte.
+     * @param value Selector text (case-insensitive).
+     * @return The corresponding wire byte.
+     * @throws std::runtime_error if value isn't one of the three selectors.
+     */
     inline uint8_t parsePortSelector(const std::string &value)
     {
         std::string v = value;
@@ -56,10 +69,20 @@ namespace commands
                                  + "': expected port1, port2, or ctrl");
     }
 
-    // Adds --bank/-b and --slot/-s int options (default 0) to sub, writing into
-    // bank/slot and returning the two CLI::Option* (so callers can check
-    // ->count() to tell "explicitly passed" apart from "left at default", e.g.
-    // via optionalBankSlotParams). Electra bank/slot values are 7-bit.
+    /**
+     * @brief Adds --bank/-b and --slot/-s int options (default 0) to sub,
+     * writing into bank/slot.
+     *
+     * Electra bank/slot values are 7-bit.
+     *
+     * @param sub Subcommand to add the options to.
+     * @param bank Written with the parsed --bank value.
+     * @param slot Written with the parsed --slot value.
+     * @param required If true, both options become required.
+     * @return The two CLI::Option* (so callers can check ->count() to tell
+     * "explicitly passed" apart from "left at default", e.g. via
+     * optionalBankSlotParams).
+     */
     inline std::pair<CLI::Option *, CLI::Option *>
         addBankSlot(CLI::App *sub, int &bank, int &slot, bool required = false)
     {
@@ -74,13 +97,26 @@ namespace commands
         return { b, s };
     }
 
+    /// @brief Encodes bank/slot as the two-byte SysEx payload prefix.
     inline std::vector<uint8_t> bankSlotParams(int bank, int slot)
     {
         return { static_cast<uint8_t>(bank), static_cast<uint8_t>(slot) };
     }
 
-    // Several "get" queries take an *optional* bank/slot (omit both to mean
-    // "the current one"). Only emit the bytes if the user actually passed them.
+    /**
+     * @brief Encodes an *optional* bank/slot payload.
+     *
+     * Several "get" queries take an optional bank/slot (omit both to mean
+     * "the current one"). Only emits the bytes if the user actually passed
+     * them.
+     *
+     * @param bankOpt The --bank CLI::Option* from addBankSlot.
+     * @param slotOpt The --slot CLI::Option* from addBankSlot.
+     * @param bank Parsed bank value.
+     * @param slot Parsed slot value.
+     * @return bankSlotParams(bank, slot) if either option was passed,
+     * otherwise an empty payload.
+     */
     inline std::vector<uint8_t> optionalBankSlotParams(CLI::Option *bankOpt,
                                                        CLI::Option *slotOpt,
                                                        int bank,
@@ -91,10 +127,14 @@ namespace commands
         return {};
     }
 
-    // Adds the Subscribe Events flag options (--page, --control-set, ...,
-    // --all) to sub, writing into the given bool references. Shared by `events
-    // subscribe`/`events listen` and `logger listen` (which subscribes too, so
-    // non-log events print alongside log messages).
+    /**
+     * @brief Adds the Subscribe Events flag options (--page, --control-set,
+     * ..., --all) to sub, writing into the given bool references.
+     *
+     * Shared by `events subscribe`/`events listen` and `logger listen`
+     * (which subscribes too, so non-log events print alongside log
+     * messages).
+     */
     inline void addSubscribeFlags(CLI::App *sub,
                                   bool &page,
                                   bool &controlSet,
@@ -118,6 +158,8 @@ namespace commands
         sub->add_flag("--all", all, "Subscribe to all event types");
     }
 
+    /// @brief Packs the Subscribe Events flags (see addSubscribeFlags) into
+    /// the wire byte; `all` short-circuits to every bit set.
     inline uint8_t subscribeFlagsToByte(bool page,
                                         bool controlSet,
                                         bool usbHost,
@@ -147,8 +189,8 @@ namespace commands
         return flags;
     }
 
-    // Serializes an ArduinoJson document to a 7-bit ASCII byte vector suitable
-    // as a SysEx payload.
+    /// @brief Serializes an ArduinoJson document to a 7-bit ASCII byte
+    /// vector suitable as a SysEx payload.
     inline std::vector<uint8_t> jsonToBytes(const JsonDocument &doc)
     {
         std::string out;
@@ -156,9 +198,12 @@ namespace commands
         return sysex::encodeAscii(out);
     }
 
-    // Registers a global --port/--port-index/--out-port-index/--in-port-index/
-    // --timeout/--txn-id/-o/--raw option group on `app`, writing into ctx. Called
-    // once from main().
+    /**
+     * @brief Registers a global
+     * --port/--port-index/--out-port-index/--in-port-index/--timeout/
+     * --txn-id/-o/--raw option group on `app`, writing into ctx.
+     * @note Called once from main().
+     */
     inline void addGlobalOptions(CLI::App &app, runner::Context &ctx)
     {
         app.add_option(

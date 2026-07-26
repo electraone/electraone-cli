@@ -170,11 +170,26 @@ namespace electraone
         return os.str();
     }
 
+    /// @brief Private implementation backing Client (pimpl).
     struct Client::Impl {
         MidiTransport transport;
         ConnectOptions options;
         bool connected = false;
 
+        /**
+         * @brief Sends category/command/params and waits for the actual
+         * reply to it, skipping any unsolicited events seen first.
+         *
+         * Many commands trigger an unsolicited notification event alongside
+         * their real reply (e.g. Upload Preset also emits a Preset List
+         * Change event) - the device doesn't guarantee which arrives first.
+         * Skip past anything that isn't actually our reply (see
+         * sysex::isReplyTo) so it can't be mistaken for it. (waitAndParse()
+         * itself stays a plain "wait for whatever's next" - that's what
+         * poll() needs it to be.)
+         *
+         * @throws std::runtime_error if not connected.
+         */
         std::optional<Response> send(uint8_t category,
                                      uint8_t command,
                                      const std::vector<uint8_t> &params,
@@ -188,13 +203,6 @@ namespace electraone
                 category, command, params, options.transactionId);
             transport.send(msg);
 
-            // Many commands trigger an unsolicited notification event alongside
-            // their real reply (e.g. Upload Preset also emits a Preset List
-            // Change event) - the device doesn't guarantee which arrives first.
-            // Skip past anything that isn't actually our reply (see
-            // sysex::isReplyTo) so it can't be mistaken for it. (waitAndParse()
-            // itself stays a plain "wait for whatever's next" - that's what
-            // poll() needs it to be.)
             while (true) {
                 auto resp = waitAndParse(timeoutMs);
                 if (!resp.has_value())
@@ -205,6 +213,8 @@ namespace electraone
             }
         }
 
+        /// @brief Waits for and parses the next incoming message, whatever
+        /// it is.
         std::optional<Response> waitAndParse(int timeoutMs)
         {
             int effectiveTimeout =

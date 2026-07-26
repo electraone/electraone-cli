@@ -45,12 +45,13 @@
 namespace ElectraCommand
 {
 
-    // The first byte after the manufacturer ID: what kind of operation this is.
+    /// @brief The first byte after the manufacturer ID: what kind of
+    /// operation this is.
     namespace Type
     {
-        constexpr uint8_t FileUpload = 0x01; // File transfer
+        constexpr uint8_t FileUpload = 0x01; ///< File transfer
         constexpr uint8_t FileRequest =
-            0x02; // (Fetch) Request in the application
+            0x02; ///< (Fetch) Request in the application
         constexpr uint8_t MidiLearnSwitch = 0x03;
         constexpr uint8_t Update = 0x04;
         constexpr uint8_t Remove = 0x05;
@@ -65,11 +66,13 @@ namespace ElectraCommand
         constexpr uint8_t Unknown = 0x00;
     } // namespace Type
 
-    // The second byte: what the operation applies to. Values are reused across
-    // different Type categories (the firmware's own Object enum does this too -
-    // e.g. FileConfig/0x02 as a command byte coincides numerically with
-    // Type::FileRequest/0x02 as a category byte; position, not value, says which
-    // is which).
+    /**
+     * @brief The second byte: what the operation applies to. Values are
+     * reused across different Type categories (the firmware's own Object
+     * enum does this too - e.g. FileConfig/0x02 as a command byte coincides
+     * numerically with Type::FileRequest/0x02 as a category byte; position,
+     * not value, says which is which).
+     */
     namespace Object
     {
         constexpr uint8_t FilePresetLegacy = 0x00;
@@ -118,21 +121,28 @@ namespace ElectraCommand
         constexpr uint8_t Disable = 0x02;
         constexpr uint8_t Enable = 0x01;
 
-        // MidiLearnOn/MidiLearnOff intentionally do NOT reuse the firmware
-        // enum's own values (MidiLearnOn=0x00, MidiLearnOff=0x01) here: per
-        // ElectraCommand::set()'s special case for MidiLearnSwitch
-        // ("TODO: ugly fix because the MIDI learn sysex is not ok"), the
-        // firmware actually decides on/off from the *wire byte* itself
-        // (objectByte == 1 -> MidiLearnOn), not from those enum values. These
-        // constants reflect that wire behaviour, which is what Client::setMidiLearn
-        // and `midi-learn enable/disable` need.
+        /**
+         * @brief On/off bytes for a Type::MidiLearnSwitch message.
+         *
+         * @note MidiLearnOn/MidiLearnOff intentionally do NOT reuse the
+         * firmware enum's own values (MidiLearnOn=0x00, MidiLearnOff=0x01)
+         * here: per ElectraCommand::set()'s special case for MidiLearnSwitch
+         * ("TODO: ugly fix because the MIDI learn sysex is not ok"), the
+         * firmware actually decides on/off from the *wire byte* itself
+         * (objectByte == 1 -> MidiLearnOn), not from those enum values. These
+         * constants reflect that wire behaviour, which is what
+         * Client::setMidiLearn and `midi-learn enable/disable` need.
+         */
         constexpr uint8_t MidiLearnOn = 0x01;
         constexpr uint8_t MidiLearnOff = 0x00;
     } // namespace Object
 
-    // The Event byte for category Type::Event (0x7E) messages - both the two the
-    // firmware's SysexApi::processEvent() itself dispatches (SnapshotBankSwitch,
-    // CaptureBankSwitch) and the ones it emits as unsolicited notifications.
+    /**
+     * @brief The Event byte for category Type::Event (0x7E) messages - both
+     * the two the firmware's SysexApi::processEvent() itself dispatches
+     * (SnapshotBankSwitch, CaptureBankSwitch) and the ones it emits as
+     * unsolicited notifications.
+     */
     namespace Event
     {
         constexpr uint8_t Nack = 0x00;
@@ -151,10 +161,14 @@ namespace ElectraCommand
         constexpr uint8_t Unknown = 0x7F;
     } // namespace Event
 
-    // Sub-command bytes read from byte1 of an UpdateRuntime/Object::Trace
-    // message (category 0x14, command 0x40). These come from SysexApi.cpp's
-    // processDebug() switch statement, not from ElectraCommand.h - there's no
-    // enum for them in the firmware header, they're just literal case labels.
+    /**
+     * @brief Sub-command bytes read from byte1 of an
+     * UpdateRuntime/Object::Trace message (category 0x14, command 0x40).
+     *
+     * @note These come from SysexApi.cpp's processDebug() switch statement,
+     * not from ElectraCommand.h - there's no enum for them in the firmware
+     * header, they're just literal case labels.
+     */
     namespace Trace
     {
         constexpr uint8_t EnableDebug = 1;

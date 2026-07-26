@@ -39,6 +39,20 @@ namespace runner
     namespace
     {
 
+        /**
+         * @brief Opens a transport, sends category/command/params, and
+         * waits for the actual reply to it, skipping any unsolicited events
+         * seen first.
+         *
+         * Many commands trigger an unsolicited notification event alongside
+         * their real reply (e.g. Upload Preset also emits a Preset List
+         * Change event) - the device doesn't guarantee which arrives first.
+         * Skip past anything that isn't actually our reply (see
+         * sysex::isReplyTo) so an unrelated event can't be mistaken for it.
+         *
+         * @param rawOut If non-null, receives the reply's raw bytes.
+         * @return The parsed reply, or std::nullopt on timeout.
+         */
         std::optional<sysex::ParsedResponse>
             sendAndReceive(const Context &ctx,
                            uint8_t category,
@@ -55,11 +69,6 @@ namespace runner
                 sysex::buildMessage(category, command, params, ctx.txnId);
             transport.send(msg);
 
-            // Many commands trigger an unsolicited notification event alongside
-            // their real reply (e.g. Upload Preset also emits a Preset List Change
-            // event) - the device doesn't guarantee which arrives first. Skip past
-            // anything that isn't actually our reply (see sysex::isReplyTo) so an
-            // unrelated event can't be mistaken for it.
             while (true) {
                 auto raw = transport.waitForReply(ctx.timeoutMs);
                 if (!raw.has_value()) {
@@ -260,11 +269,16 @@ namespace runner
         if (durationSec > 0)
             deadline = clock::now() + std::chrono::seconds(durationSec);
 
-        // `listen` commands are meant to run until Ctrl+C or --duration, not
-        // ctx.timeoutMs (that's for quick one-shot request/reply commands) - so
-        // both the initial setup handshake and the event loop below poll in
-        // short increments, bounded only by --duration if one was given.
-        // Without --duration this waits indefinitely, which is the point.
+        /**
+         * @brief Polls for the next incoming message, bounded only by
+         * --duration.
+         *
+         * `listen` commands are meant to run until Ctrl+C or --duration, not
+         * ctx.timeoutMs (that's for quick one-shot request/reply commands) -
+         * so both the initial setup handshake and the event loop below poll
+         * in short increments, bounded only by --duration if one was given.
+         * Without --duration this waits indefinitely, which is the point.
+         */
         auto waitForNext = [&]() -> std::optional<std::vector<uint8_t>> {
             while (!deadline.has_value() || clock::now() < *deadline) {
                 auto msg = transport.waitForReply(200);

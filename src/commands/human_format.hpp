@@ -19,12 +19,25 @@
 * along with this program.
 */
 
+/**
+ * @file human_format.hpp
+ *
+ * @brief Renders a JSON response as human-friendly output for `--human`:
+ * objects as an indented tree, arrays of objects as an `ls -l`-style table,
+ * and arrays of scalars as an `ls`-style grid.
+ */
+
 #pragma once
 
 #include <string>
 
 namespace commands
 {
+    /**
+     * @brief Renders JSON text for human reading.
+     * @param text Response text.
+     * @return The rendered text, or text unchanged if it isn't valid JSON.
+     */
     std::string formatHumanReadable(const std::string &text);
 
-}
+} // namespace commands

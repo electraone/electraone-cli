@@ -19,6 +19,29 @@
 * along with this program.
 */
 
+/**
+ * @file files_commands.cpp
+ *
+ * @brief File Transfer SysEx API (firmware 4.0+):
+ * https://docs.electra.one/developers/filetransfer.html
+ *
+ * @note Chunk encoding assumption: the docs describe Transfer Chunks'
+ * payload only as "MIDI 7-bit encoded", without giving a bit-packing
+ * algorithm for arbitrary 8-bit bytes (unlike, say, classic SysEx sample
+ * dumps). Every other payload in the wider Electra SysEx protocol is
+ * literal ASCII/7-bit bytes with no packing, so that's what `files upload`
+ * does by default: each source byte is sent as-is, and it's rejected up
+ * front if any byte is >= 0x80. This covers the realistic use cases (Lua
+ * scripts, JSON presets/config, deviceList, datafiles) since they're all
+ * text already. For genuinely binary content (firmware/bootloader) pass
+ * --allow-binary to bypass that check - bytes are still sent unpacked, so
+ * on real 8-bit binary data this will very likely fail with an MD5 mismatch
+ * at Commit rather than silently corrupting anything (Commit is atomic and
+ * verifies MD5 before applying anything), but there's no verified encoding
+ * to fall back to. If you find the real packing scheme, this is the place
+ * to add it.
+ */
+
 #include <iostream>
 #include <stdexcept>
 
@@ -30,27 +53,11 @@
 #include "electra_command.hpp"
 #include "md5.hpp"
 
-// File Transfer SysEx API (firmware 4.0+):
-//   https://docs.electra.one/developers/filetransfer.html
-//
-// Chunk encoding assumption: the docs describe Transfer Chunks' payload only
-// as "MIDI 7-bit encoded", without giving a bit-packing algorithm for
-// arbitrary 8-bit bytes (unlike, say, classic SysEx sample dumps). Every
-// other payload in the wider Electra SysEx protocol is literal ASCII/7-bit
-// bytes with no packing, so that's what `files upload` does by default:
-// each source byte is sent as-is, and it's rejected up front if any byte is
-// >= 0x80. This covers the realistic use cases (Lua scripts, JSON presets/
-// config, deviceList, datafiles) since they're all text already. For
-// genuinely binary content (firmware/bootloader) pass --allow-binary to
-// bypass that check - bytes are still sent unpacked, so on real 8-bit binary
-// data this will very likely fail with an MD5 mismatch at Commit rather
-// than silently corrupting anything (Commit is atomic and verifies MD5
-// before applying anything), but there's no verified encoding to fall back
-// to. If you find the real packing scheme, this is the place to add it.
-
 namespace
 {
 
+    /// @brief Builds the location JSON payload shared by `files list` and
+    /// `files remove`.
     std::vector<uint8_t> locationJson(const std::string &location,
                                       CLI::Option *bankOpt,
                                       int bank,

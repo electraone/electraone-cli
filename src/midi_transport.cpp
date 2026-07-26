@@ -44,8 +44,16 @@ namespace
         return s;
     }
 
-    // Finds single port index whose name contains needle (case-insensitive).
-    // Throws std::runtime_error listing all candidates if the match count != 1.
+    /**
+     * @brief Finds the single port index whose name contains needle
+     * (case-insensitive).
+     * @param names Candidate port names.
+     * @param needle Case-insensitive substring to match.
+     * @param direction "output" or "input", for the error message.
+     * @return The matching index.
+     * @throws std::runtime_error (listing all candidates) if the match
+     * count != 1.
+     */
     unsigned int findPortByName(const std::vector<std::string> &names,
                                 const std::string &needle,
                                 const char *direction)

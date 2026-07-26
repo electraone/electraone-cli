@@ -19,6 +19,13 @@
 * along with this program.
 */
 
+/**
+ * @file terminal.hpp
+ *
+ * @brief Terminal detection helpers shared by the progress bar and
+ * `--human` grid layout.
+ */
+
 #pragma once
 
 #include <cstddef>
@@ -26,14 +33,18 @@
 namespace commands
 {
 
-    // True if stdout is attached to a real terminal rather than redirected or
-    // piped. Used to gate anything that updates a line in place (a progress
-    // bar, the `--human` grid layout for arrays of scalars) - that only makes
-    // sense on an actual terminal.
+    /**
+     * @brief Checks whether stdout is attached to a real terminal rather
+     * than redirected or piped.
+     *
+     * Used to gate anything that updates a line in place (a progress bar,
+     * the `--human` grid layout for arrays of scalars) - that only makes
+     * sense on an actual terminal.
+     */
     bool isStdoutTerminal();
 
-    // Current terminal width in columns, or 80 if it can't be determined (not a
-    // terminal, or the platform call failed).
+    /// @brief Current terminal width in columns, or 80 if it can't be
+    /// determined (not a terminal, or the platform call failed).
     size_t terminalWidth();
 
 } // namespace commands

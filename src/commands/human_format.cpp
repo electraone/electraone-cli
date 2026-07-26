@@ -36,7 +36,8 @@ namespace commands
     namespace
     {
 
-        // Renders a scalar (string/number/bool/null) without JSON string quoting.
+        /// @brief Renders a scalar (string/number/bool/null) without JSON
+        /// string quoting.
         std::string scalarText(JsonVariantConst v)
         {
             if (v.isNull())
@@ -48,8 +49,9 @@ namespace commands
             return s;
         }
 
-        // Renders any value compactly for a table cell: scalars unquoted, nested
-        // objects/arrays as compact JSON so the table stays one line per row.
+        /// @brief Renders any value compactly for a table cell: scalars
+        /// unquoted, nested objects/arrays as compact JSON so the table
+        /// stays one line per row.
         std::string cellText(JsonVariantConst v)
         {
             if (v.is<JsonObjectConst>() || v.is<JsonArrayConst>()) {
@@ -138,8 +140,9 @@ namespace commands
             }
         }
 
-        // Arrays of objects: an `ls -l`-style aligned table, one row per element,
-        // columns = the union of keys across all elements (in first-seen order).
+        /// @brief Arrays of objects: an `ls -l`-style aligned table, one
+        /// row per element, columns = the union of keys across all
+        /// elements (in first-seen order).
         void renderTable(std::ostream &os, JsonArrayConst arr, int indent)
         {
             std::string pad(static_cast<size_t>(indent) * 2, ' ');
@@ -188,10 +191,13 @@ namespace commands
             }
         }
 
-        // Arrays of scalars: a terminal-width-aware multi-column grid, laid out
-        // top-to-bottom-then-next-column like plain `ls`. Falls back to one item
-        // per line when stdout isn't a terminal (also matching `ls`'s own behavior
-        // when piped/redirected).
+        /**
+         * @brief Arrays of scalars: a terminal-width-aware multi-column
+         * grid, laid out top-to-bottom-then-next-column like plain `ls`.
+         *
+         * Falls back to one item per line when stdout isn't a terminal
+         * (also matching `ls`'s own behavior when piped/redirected).
+         */
         void renderGrid(std::ostream &os, JsonArrayConst arr, int indent)
         {
             std::string pad(static_cast<size_t>(indent) * 2, ' ');

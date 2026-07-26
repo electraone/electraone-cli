@@ -19,6 +19,12 @@
 * along with this program.
 */
 
+/**
+ * @file midi_transport.hpp
+ *
+ * @brief RtMidi-based MIDI I/O for the Electra One CTRL port.
+ */
+
 #pragma once
 
 #include <cstdint>
@@ -30,10 +36,14 @@
 class RtMidiIn;
 class RtMidiOut;
 
-// Thin wrapper around RtMidiIn/RtMidiOut for talking to the Electra One CTRL
-// port: port discovery, sending a SysEx message, and polling for a reply.
-// Assumes one request is in flight at a time, matching how the CLI issues a
-// single command per invocation.
+/**
+ * @brief Thin wrapper around RtMidiIn/RtMidiOut for talking to the Electra
+ * One CTRL port: port discovery, sending a SysEx message, and polling for a
+ * reply.
+ *
+ * @note Assumes one request is in flight at a time, matching how the CLI
+ * issues a single command per invocation.
+ */
 class MidiTransport
 {
 public:
@@ -43,31 +53,49 @@ public:
     MidiTransport(const MidiTransport &) = delete;
     MidiTransport &operator=(const MidiTransport &) = delete;
 
-    // Prints all available MIDI output and input ports with their indices.
+    /// @brief Prints all available MIDI output and input ports with their
+    /// indices.
     static void listPorts();
 
-    // Same enumeration as listPorts(), returned as name lists instead of
-    // printed.
+    /// @brief Same enumeration as listPorts(), returned as a name list
+    /// instead of printed.
+    /// @return The available MIDI output port names.
     static std::vector<std::string> listOutputPortNames();
+    /// @copybrief listOutputPortNames
+    /// @return The available MIDI input port names.
     static std::vector<std::string> listInputPortNames();
 
-    // Opens the output+input port pair whose name contains nameSubstring
-    // (case-insensitive). outPortIndex/inPortIndex, if set, each open that
-    // index directly on the corresponding port list instead of name-matching
-    // - independently, since the output and input port lists aren't always
-    // the same length (e.g. on Windows, a software-only synth can appear as
-    // an extra output port with no matching input, shifting every real
-    // device's output index out of alignment with its input index). Throws
-    // std::runtime_error with the candidate list if a name match isn't
-    // exactly one port, or if an explicit index is out of range.
+    /**
+     * @brief Opens the output+input port pair whose name contains
+     * nameSubstring (case-insensitive).
+     *
+     * outPortIndex/inPortIndex, if set, each open that index directly on the
+     * corresponding port list instead of name-matching - independently,
+     * since the output and input port lists aren't always the same length
+     * (e.g. on Windows, a software-only synth can appear as an extra output
+     * port with no matching input, shifting every real device's output
+     * index out of alignment with its input index).
+     *
+     * @param nameSubstring Case-insensitive substring to match port names.
+     * @param outPortIndex Explicit output port index, bypassing name
+     * matching.
+     * @param inPortIndex Explicit input port index, bypassing name matching.
+     * @throws std::runtime_error (with the candidate list) if a name match
+     * isn't exactly one port, or if an explicit index is out of range.
+     */
     void open(const std::string &nameSubstring,
               std::optional<unsigned int> outPortIndex,
               std::optional<unsigned int> inPortIndex);
 
+    /// @brief Sends a fully-formed message (including F0...F7).
     void send(const std::vector<uint8_t> &bytes);
 
-    // Polls for the next complete Electra SysEx message (F0 00 21 45 ...)
-    // within timeoutMs. Returns std::nullopt on timeout.
+    /**
+     * @brief Polls for the next complete Electra SysEx message
+     * (F0 00 21 45 ...) within timeoutMs.
+     * @param timeoutMs Timeout in milliseconds.
+     * @return The raw message, or std::nullopt on timeout.
+     */
     std::optional<std::vector<uint8_t>> waitForReply(int timeoutMs);
 
 private:
