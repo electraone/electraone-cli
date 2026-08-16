@@ -39,8 +39,7 @@ namespace runner
     struct Context;
 }
 
-/// @brief Registers `info`, `debug`, `midi-learn`, `usb-devices`,
-/// `parameter-map`, and `screenshot`.
+/// @brief Registers `info` commands
 void registerInfoCommands(CLI::App &app, runner::Context &ctx);
 /// @brief Registers the `preset` command group.
 void registerPresetCommands(CLI::App &app, runner::Context &ctx);
@@ -62,6 +61,12 @@ void registerCaptureCommands(CLI::App &app, runner::Context &ctx);
 void registerControlCommands(CLI::App &app, runner::Context &ctx);
 /// @brief Registers the `ui` command group.
 void registerUiCommands(CLI::App &app, runner::Context &ctx);
+/// @brief Registers the `debug` command group.
+void registerDebugCommands(CLI::App &app, runner::Context &ctx);
+/// @brief Registers the `midi-learn` command group.
+void registerMidiLearnCommands(CLI::App &app, runner::Context &ctx);
+/// @brief Registers commands related to the controller system
+void registerSystemCommands(CLI::App &app, runner::Context &ctx);
 /// @brief Registers the `events` command group.
 void registerEventsCommands(CLI::App &app, runner::Context &ctx);
 /// @brief Registers the `logger` command group.

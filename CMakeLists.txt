@@ -121,6 +121,9 @@ add_executable(${ELECTRAONE_CLI_NAME}
   src/commands/progress.cpp
   src/commands/event_decoder.cpp
   src/commands/info_commands.cpp
+  src/commands/debug_commands.cpp
+  src/commands/midilearn_commands.cpp
+  src/commands/system_commands.cpp
   src/commands/preset_commands.cpp
   src/commands/lua_commands.cpp
   src/commands/overrides_commands.cpp

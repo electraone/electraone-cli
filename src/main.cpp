@@ -57,6 +57,9 @@ int main(int argc, char **argv)
     registerCaptureCommands(app, ctx);
     registerControlCommands(app, ctx);
     registerUiCommands(app, ctx);
+    registerDebugCommands(app, ctx);
+    registerMidiLearnCommands(app, ctx);
+    registerSystemCommands(app, ctx);
     registerEventsCommands(app, ctx);
     registerLoggerCommands(app, ctx);
     registerWindowCommands(app, ctx);
