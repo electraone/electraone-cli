@@ -313,7 +313,7 @@ namespace electraone
         /// @brief Set Preset Slot (runtime, volatile).
         std::optional<Response> setPresetSlot(int bank, int slot);
         /// @brief Reload Preset Slot.
-        std::optional<Response> reloadPresetSlot();
+        std::optional<Response> reloadPresetSlot(int bank, int slot);
         /// @brief Load Preloaded Preset (runtime, volatile).
         std::optional<Response>
             loadPreloadedPreset(int bank, int slot, const std::string &path);

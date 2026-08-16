@@ -423,11 +423,11 @@ namespace electraone
                     bankSlot(bank, slot));
     }
 
-    std::optional<Response> Client::reloadPresetSlot()
+    std::optional<Response> Client::reloadPresetSlot(int bank, int slot)
     {
         return send(ElectraCommand::Type::Execute,
                     ElectraCommand::Object::PresetSlot,
-                    {});
+                    optionalBankSlot(bank, slot));
     }
 
     std::optional<Response>
