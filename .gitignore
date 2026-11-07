@@ -1,3 +1,4 @@
 build/
 .claude
 basic_usage
+build-*/
