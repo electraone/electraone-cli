@@ -43,6 +43,81 @@ This produces:
 
 Exact output paths / names differ slightly per platform.
 
+### Packages (DEB, RPM, TGZ)
+
+After building, create packages with CPack from the `build/` directory:
+
+```bash
+cd build
+cpack -G DEB    # build/electraone-1.0-Linux.deb
+cpack -G RPM    # build/electraone-1.0-Linux.rpm
+cpack -G TGZ    # build/electraone-1.0-Linux.tar.gz
+```
+
+Running `cpack` without `-G` builds all three. Packaging needs:
+
+- DEB: `dpkg-dev` (for `dpkg-shlibdeps`)
+- RPM: `rpmbuild`, on Debian/Ubuntu provided by `sudo apt install rpm`
+
+The package contains only `electraone`, `libelectraone.a` and the
+`electraone/*.hpp` headers. RtMidi is a package dependency (`librtmidi-dev` /
+`rtmidi-devel`), so install the system RtMidi before configuring and use
+`apt`/`dnf` to install the package, which resolves dependencies:
+
+```bash
+sudo apt install ./build/electraone-1.0-Linux.deb
+sudo dnf install ./build/electraone-1.0-Linux.rpm
+```
+
+#### Windows packages, cross-compiled on Linux
+
+The Windows `.zip` and installer `.exe` can be built on Debian/Ubuntu with
+MinGW-w64, no Windows machine needed.
+
+Required packages:
+
+| Package | Needed for |
+|---|---|
+| `cmake`, `git` | configure, fetching RtMidi/CLI11/ArduinoJson |
+| `mingw-w64` | cross compiler (pulls in `g++-mingw-w64-x86-64-posix` and `binutils-mingw-w64-x86-64`) |
+| `nsis` | optional, the `makensis` installer builder for `cpack -G NSIS` |
+| `wine` | optional, runs the unit tests on the build host |
+
+```bash
+sudo apt install cmake git mingw-w64          # required
+sudo apt install nsis wine                    # optional
+```
+
+No Windows libraries need to be installed: RtMidi is fetched and built
+statically against WinMM, and ALSA/JACK or the host `librtmidi-dev` are not
+used. The toolchain file selects the `-posix` MinGW compiler, which is
+required because the code uses `std::thread`.
+
+Build and package in a separate build directory:
+
+```bash
+cmake -S . -B build-win64 -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/mingw-w64-x86_64.cmake -DCMAKE_BUILD_TYPE=Release
+cmake --build build-win64
+cd build-win64
+cpack -G ZIP    # electraone-1.0-win64.zip
+cpack -G NSIS   # electraone-1.0-win64.exe (installer, needs nsis)
+```
+
+Running `cpack` without `-G` builds the ZIP, plus the NSIS installer when
+`makensis` is found. Reconfigure (`cmake .` in `build-win64/`) after
+installing `nsis` or `wine`, since both are detected at configure time.
+
+Package contents:
+
+- `bin/electraone.exe` - MinGW runtime linked statically, needs only system
+  DLLs (`KERNEL32`, `msvcrt`, `WINMM`)
+- `lib/libelectraone.a`, `lib/librtmidi.a` - for programs linking the C++
+  API library with MinGW (also link `-lwinmm`)
+- `include/electraone/*.hpp`
+
+The installer installs to `C:\Program Files\electraone` and offers to add
+`bin` to `PATH`. Unit tests are skipped unless `wine` is installed.
+
 ### Prerequisites per platform
 
 #### Linux
