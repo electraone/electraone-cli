@@ -7,12 +7,24 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
+if(MINGW)
+  # Bundle libstdc++, libgcc and winpthread so the .exe runs without MinGW DLLs.
+  add_link_options(-static)
+endif()
+
 include(FetchContent)
 
 # ---- RtMidi ---------------------------------------------------------------
 find_package(RtMidi CONFIG QUIET)
 if(NOT RtMidi_FOUND)
-  message(STATUS "RtMidi not found via find_package, fetching from source")
+  # Debian/Ubuntu librtmidi-dev ships only a pkg-config file, no CMake config.
+  find_package(PkgConfig QUIET)
+  if(PkgConfig_FOUND)
+    pkg_check_modules(RTMIDI_PC IMPORTED_TARGET rtmidi)
+  endif()
+endif()
+if(NOT RtMidi_FOUND AND NOT RTMIDI_PC_FOUND)
+  message(STATUS "RtMidi not found via find_package or pkg-config, fetching from source")
   set(RTMIDI_BUILD_TESTING OFF CACHE BOOL "" FORCE)
   # Static, not RtMidi's own default (shared): keeps electraone/electraone_api
   # self-contained everywhere, instead of needing librtmidi.so/.dylib/.dll
@@ -52,8 +64,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(ArduinoJson)
 
-# Resolve once: find_package gives a namespaced target, FetchContent gives a bare one.
-set(RTMIDI_TARGET $<IF:$<TARGET_EXISTS:RtMidi::rtmidi>,RtMidi::rtmidi,rtmidi>)
+# Resolve once: find_package gives a namespaced target, pkg-config an imported one, FetchContent a bare one.
+if(RtMidi_FOUND)
+  set(RTMIDI_TARGET RtMidi::rtmidi)
+elseif(RTMIDI_PC_FOUND)
+  set(RTMIDI_TARGET PkgConfig::RTMIDI_PC)
+else()
+  set(RTMIDI_TARGET rtmidi)
+endif()
 set(CLI11_TARGET $<IF:$<TARGET_EXISTS:CLI11::CLI11>,CLI11::CLI11,CLI11>)
 
 # ---- electraone API library ------------------------------------------------
@@ -91,13 +109,6 @@ target_include_directories(electraone_api
 target_link_libraries(electraone_api
   PUBLIC ${RTMIDI_TARGET}
   PRIVATE ArduinoJson
-)
-
-install(TARGETS electraone_api ARCHIVE DESTINATION lib)
-install(FILES
-  include/electraone/ElectraOneClient.hpp
-  src/sysex.hpp
-  DESTINATION include/electraone
 )
 
 # ---- electraone CLI ------------------------------------------------------------
@@ -149,8 +160,6 @@ target_link_libraries(${ELECTRAONE_CLI_NAME} PRIVATE
   ArduinoJson
 )
 
-install(TARGETS ${ELECTRAONE_CLI_NAME} RUNTIME DESTINATION bin)
-
 # ---- examples ---------------------------------------------------------------
 # Built the same way on every platform via `cmake --build build` - no manual
 # per-OS link line needed, since electraone_api already carries its RtMidi
@@ -170,7 +179,9 @@ endif()
 # the top-level CMake project, so embedding electraone_api via
 # add_subdirectory in another project doesn't pull in our test target too.
 option(ELECTRAONE_BUILD_TESTS "Build unit tests" ON)
-if(ELECTRAONE_BUILD_TESTS AND CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+# doctest_discover_tests runs the test binary at build time, which needs an emulator when cross-compiling.
+if(ELECTRAONE_BUILD_TESTS AND CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR
+   AND (NOT CMAKE_CROSSCOMPILING OR CMAKE_CROSSCOMPILING_EMULATOR))
   FetchContent_Declare(
     doctest
     GIT_REPOSITORY https://github.com/doctest/doctest.git
@@ -190,7 +201,75 @@ if(ELECTRAONE_BUILD_TESTS AND CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR
   )
   target_include_directories(electraone_tests PRIVATE src)
   target_link_libraries(electraone_tests PRIVATE electraone_api doctest::doctest)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    # GCC 14 false positive on vector insert + push_back in test_sysex.cpp.
+    target_compile_options(electraone_tests PRIVATE -Wno-stringop-overflow)
+  endif()
 
   include(${doctest_SOURCE_DIR}/scripts/cmake/doctest.cmake)
   doctest_discover_tests(electraone_tests)
 endif()
+
+# ==========================================
+# 1. INSTALLATION DIRECTIVES 
+# ==========================================
+include(GNUInstallDirs)
+
+install(TARGETS ${ELECTRAONE_CLI_NAME} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT electraone)
+install(TARGETS electraone_api ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT electraone)
+if(RTMIDI_TARGET STREQUAL "rtmidi")
+  # No system RtMidi to depend on (e.g. Windows): ship the fetched static lib for libelectraone.a users.
+  install(FILES $<TARGET_LINKER_FILE:rtmidi> DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT electraone)
+endif()
+install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/electraone/ElectraOneClient.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/electraone/sysex.hpp
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/electraone
+    COMPONENT electraone
+)
+
+# ==========================================
+# CPACK CONFIGURATION
+# ==========================================
+set(CPACK_PACKAGE_NAME "electraone")
+set(CPACK_PACKAGE_VENDOR "Electra One")
+set(CPACK_PACKAGE_VERSION "1.0")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A cross-platform command-line suite and C++ client library for the Electra One SysEx protocol.")
+set(CPACK_PACKAGE_CONTACT "info@electra.one")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+
+# Package only our component; FetchContent deps (RtMidi, ArduinoJson, doctest) add their own install rules.
+set(CPACK_INSTALL_CMAKE_PROJECTS "${CMAKE_BINARY_DIR};${PROJECT_NAME};electraone;/")
+
+if(WIN32)
+  # ZIP always; NSIS installer when makensis is available (apt install nsis).
+  set(CPACK_GENERATOR "ZIP")
+  find_program(MAKENSIS_EXECUTABLE makensis)
+  if(MAKENSIS_EXECUTABLE)
+    list(APPEND CPACK_GENERATOR "NSIS")
+  endif()
+  set(CPACK_PACKAGE_INSTALL_DIRECTORY "electraone")
+  set(CPACK_NSIS_DISPLAY_NAME "electraone")
+  set(CPACK_NSIS_MODIFY_PATH ON)
+  set(CPACK_NSIS_URL_INFO_ABOUT "https://electra.one")
+else()
+  set(CPACK_GENERATOR "RPM;DEB;TGZ")
+endif()
+
+# Debian Target Configuration
+set(CPACK_DEBIAN_PACKAGE_SECTION "sound")
+set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://electra.one")
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+# libelectraone.a consumers need the RtMidi headers and library too.
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "librtmidi-dev")
+
+# RPM Target Configuration (Fedora/RHEL/openSUSE)
+set(CPACK_RPM_PACKAGE_LICENSE "GPLv3")
+set(CPACK_RPM_PACKAGE_GROUP "Applications/Multimedia")
+set(CPACK_RPM_PACKAGE_RELEASE "1")
+set(CPACK_RPM_PACKAGE_REQUIRES "libjack.so.0()(64bit), libasound.so.2()(64bit), rtmidi-devel")
+set(CPACK_RPM_PACKAGE_URL "https://electra.one")
+
+include(CPack)
+
